@@ -53,6 +53,9 @@ function localizeAndContinue(lang) {
     for (var i = 0; i < earr.length; i++) {
         var uuid = earr[i].dataset.i18n;
         var str = (larr.hasOwnProperty(uuid) ? larr[uuid] : enus[uuid]);
+        if (Array.isArray(str)) {
+            str = str[0];
+        }
         var tag = str.match(/\{%\$?[\w\-]+\}/g);
         while (tag != null) {
             for (var j = 0; j < tag.length; j++) {
@@ -109,6 +112,11 @@ function showCtrlPanel() {
                 toggleControls();
             }
         }, 250);
+
+        // Ajouter un écouteur d'événement pour fermer la fenêtre lorsqu'elle perd le focus
+        ctrlPanelWindow.addEventListener('blur', function() {
+            ctrlPanelWindow.close();
+        });
     } else {
         ctrlPanelWindow.focus();
     }

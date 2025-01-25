@@ -16,7 +16,7 @@
             <input type="checkbox" id="toggleColors" onclick="toggleInversedColors()">
         </div>
         <div class="timer" id="maintimer">
-            <table><tbody><tr><td class="abcd noselect" onclick="toggleABCD();"><div id="abcd" style="display: none;">A<br />B</div></td><td id="timer" class="noselect" onclick="setTime();">120</td></tr></tbody></table>
+            <table><tbody><tr><td class="abcd noselect" onclick="toggleABCD();"><div id="abcd" style="display: none;">A<br />B</div></td><td id="timer">120</td></tr></tbody></table>
         </div>
         <div class="config" id="osccontrols">
             <a href="javascript:void(0);" onclick="startTimer();" data-i18n="176cd88e-ad14-4a8b-9633-c8257ad35d92"></a><br /><a href="javascript:void(0);" class="egcy" onclick="ceaseFire();" data-i18n="2e507705-99cb-4d92-8fa7-436e32b67083"></a>
@@ -74,7 +74,7 @@
                 <p><img src="flags/us.svg?" alt="US" class="imgflag" onclick="localizeAndContinue('enUS');" /> <img src="flags/no.svg?" alt="NO" class="imgflag" onclick="localizeAndContinue('nbNO');" /></p>
             </div>
         </div>
-        <button id="complexPanelButton" onclick="showCtrlPanel()">Panneau complexe</button>
+        <button id="complexPanelButton" onclick="showCtrlPanel()">Options</button>
         <input type="number" min="3" id="prepTime" placeholder="Temps de préparation (s)">
         <a href="https://github.com/bilde2910/ArcheryTimer" class="hidden" id="github-fork"></a>
         <script type="text/javascript">
