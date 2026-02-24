@@ -488,7 +488,6 @@ function tick() {
 
     if (!state.shootStarted && phaseState.phase === 'shoot') {
         state.shootStarted = true;
-        playSound(dom.beep1);
     }
 
     if (!state.lowTimeReached && phaseState.phase === 'shoot' && phaseState.shootRemainingMs <= 20000) {
@@ -525,7 +524,9 @@ function startTimer() {
     state.pausedElapsedMs = 0;
 
     startLoop();
-    if (!resumed) {
+    if (resumed) {
+        playSound(dom.beep1);
+    } else {
         playSound(dom.beep2);
     }
     render();
