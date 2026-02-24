@@ -386,15 +386,15 @@ body.theme-inversed #startAction:hover {
 }
 
 .lang-btn.lang-fr {
-    background-image: url('flags/fr.svg');
+    background-image: url('/assets/flags/fr.svg');
 }
 
 .lang-btn.lang-en {
-    background-image: url('flags/us.svg');
+    background-image: url('/assets/flags/us.svg');
 }
 
 .lang-btn.lang-no {
-    background-image: url('flags/no.svg');
+    background-image: url('/assets/flags/no.svg');
 }
 
 .lang-btn:hover {

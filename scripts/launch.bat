@@ -1,6 +1,8 @@
 :: Récupérer le navigateur par défaut depuis le registre
 for /f "tokens=2*" %%A in ('reg query "HKEY_CURRENT_USER\Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice" /v ProgId') do set DefaultBrowser=%%B
 
+cd /d "%~dp0.."
+
 set URL=http://localhost
 
 if "%DefaultBrowser%" == "ChromeHTML" (
