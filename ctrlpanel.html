@@ -2,86 +2,184 @@
 <html>
     <head>
         <title>Archery timer control panel</title>
-		<link rel="icon" type="image/png" href="favicon.png">
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="icon" type="image/png" href="favicon.png">
         <style type="text/css">
 * {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 10px;
     background-color: black;
-}
-button {
-    width: 100%;
-    height: 7.5vw;
-    font-size: 5vw;
     color: white;
+    font-family: sans-serif;
 }
+
 table {
     width: 100%;
+    border-collapse: separate;
+    border-spacing: 6px;
 }
+
+button {
+    width: 100%;
+    height: clamp(40px, 7vw, 72px);
+    font-size: clamp(1rem, 3.8vw, 2.5rem);
+    border: 1px solid #4a4a4a;
+    border-radius: 6px;
+    background-color: #171717;
+    color: white;
+    cursor: pointer;
+}
+
+button:hover {
+    border-color: #7a7a7a;
+}
+
+button.start-btn {
+    color: #7ff08f;
+}
+
+button.stop-btn {
+    color: #ff8a00;
+    border: 3px solid transparent;
+    background: linear-gradient(#171717, #171717) padding-box,
+        repeating-linear-gradient(45deg, #ff8a00 0 10px, #000 10px 20px) border-box;
+}
+
+button.stop-btn.is-disabled {
+    color: #666;
+    border-color: #444;
+    background: #1a1a1a;
+    cursor: default;
+}
+
 td.abcd {
     width: 16.667%;
 }
+
 td.abcd button {
     color: #ffa500;
 }
+
 .tctrl {
-    font-size: 3vw;
+    font-size: clamp(0.8rem, 2.2vw, 1.4rem);
 }
+
 .w50 {
     width: 50%;
 }
         </style>
-		<script type="text/javascript">
-			var i18n = window.opener.getI18NArray();
-			
-			function localize() {
-				var lang = window.opener.getLanguage();
-				var larr = i18n[lang];
-				var enus = i18n["enUS"];
-				var earr = document.querySelectorAll('[data-i18n]');
-				for (var i = 0; i < earr.length; i++) {
-					var uuid = earr[i].dataset.i18n;
-					var str = (larr.hasOwnProperty(uuid) ? larr[uuid] : enus[uuid]);
-					var tag = str.match(/\{%\$?[\w\-]+\}/g);
-					while (tag != null) {
-						for (var j = 0; j < tag.length; j++) {
-							var tagnaked = tag[j].slice(2, -1).toLowerCase();
-							str = str.replace(tag[j], (tagnaked.substr(0, 1) == "$" ? (larr.hasOwnProperty(tagnaked.substring(1)) ? larr[tagnaked.substring(1)] : enus[tagnaked.substring(1)]) : earr[i].getAttribute("data-i18n-" + tagnaked)));
-						}
-						tag = str.match(/\{%\$?[\w\-]+\}/g);
-					}
-					earr[i].innerHTML = str;
-				}
-			}
-		</script>
+        <script type="text/javascript">
+            var i18n = null;
+            var stateTimer = null;
+            var activeLanguage = null;
+
+            function localize(langOverride) {
+                if (!window.opener || !window.opener.getI18NArray) {
+                    return;
+                }
+
+                i18n = window.opener.getI18NArray();
+                var lang = langOverride || window.opener.getLanguage();
+                activeLanguage = lang;
+                var larr = i18n[lang];
+                var enus = i18n.enUS;
+                var earr = document.querySelectorAll('[data-i18n]');
+
+                for (var i = 0; i < earr.length; i++) {
+                    var key = earr[i].dataset.i18n;
+                    var str = (Object.prototype.hasOwnProperty.call(larr, key) ? larr[key] : enus[key]);
+                    var tag = str.match(/\{%\$?[\w.-]+\}/g);
+                    while (tag !== null) {
+                        for (var j = 0; j < tag.length; j++) {
+                            var tagnaked = tag[j].slice(2, -1).toLowerCase();
+                            str = str.replace(
+                                tag[j],
+                                (tagnaked.substr(0, 1) === '$'
+                                    ? (Object.prototype.hasOwnProperty.call(larr, tagnaked.substring(1)) ? larr[tagnaked.substring(1)] : enus[tagnaked.substring(1)])
+                                    : earr[i].getAttribute('data-i18n-' + tagnaked))
+                            );
+                        }
+                        tag = str.match(/\{%\$?[\w.-]+\}/g);
+                    }
+                    earr[i].innerHTML = str;
+                }
+            }
+
+            function refreshState() {
+                if (!window.opener || window.opener.closed) {
+                    window.close();
+                    return;
+                }
+
+                if (!window.opener.getUiSnapshot) {
+                    return;
+                }
+
+                var snapshot = window.opener.getUiSnapshot();
+                var startButton = document.getElementById('ctrlStart');
+                var stopButton = document.getElementById('ctrlStop');
+
+                if (snapshot.language && snapshot.language !== activeLanguage) {
+                    localize(snapshot.language);
+                }
+
+                if (startButton && snapshot.primaryActionLabel) {
+                    startButton.textContent = snapshot.primaryActionLabel;
+                }
+
+                if (stopButton) {
+                    stopButton.disabled = !snapshot.emergencyEnabled;
+                    stopButton.classList.toggle('is-disabled', !snapshot.emergencyEnabled);
+                }
+            }
+
+            function init() {
+                localize();
+                refreshState();
+                stateTimer = setInterval(refreshState, 200);
+            }
+
+            window.addEventListener('beforeunload', function() {
+                if (stateTimer !== null) {
+                    clearInterval(stateTimer);
+                }
+            });
+        </script>
     </head>
-    <body onload="localize();">
+    <body onload="init();">
         <table>
             <tbody>
                 <tr>
-                    <td><button onclick="window.opener.setTime2(10);" data-i18n="6e7c53cb-4dd0-4376-92ea-d6392a309be4" data-i18n-seconds="10"></button></td>
-                    <td><button onclick="window.opener.setTime2(20);" data-i18n="6e7c53cb-4dd0-4376-92ea-d6392a309be4" data-i18n-seconds="20"></button></td>
-                    <td class="w50" colspan="3"><button onclick="window.opener.startTimer();" style="color: lime;" data-i18n="176cd88e-ad14-4a8b-9633-c8257ad35d92"></button></td>
+                    <td><button onclick="window.opener.setTime2(10);" data-i18n="misc.seconds_short" data-i18n-seconds="10"></button></td>
+                    <td><button onclick="window.opener.setTime2(20);" data-i18n="misc.seconds_short" data-i18n-seconds="20"></button></td>
+                    <td class="w50" colspan="3"><button id="ctrlStart" class="start-btn" onclick="window.opener.startTimer();" data-i18n="controls.primary.start"></button></td>
                 </tr>
                 <tr>
-                    <td><button onclick="window.opener.setTime2(40);" data-i18n="6e7c53cb-4dd0-4376-92ea-d6392a309be4" data-i18n-seconds="40"></button></td>
-                    <td><button onclick="window.opener.setTime2(60);" data-i18n="6e7c53cb-4dd0-4376-92ea-d6392a309be4" data-i18n-seconds="60"></button></td>
-                    <td class="w50" colspan="3"><button onclick="window.opener.ceaseFire();" style="color: red;" data-i18n="2e507705-99cb-4d92-8fa7-436e32b67083"></button></td>
+                    <td><button onclick="window.opener.setTime2(40);" data-i18n="misc.seconds_short" data-i18n-seconds="40"></button></td>
+                    <td><button onclick="window.opener.setTime2(60);" data-i18n="misc.seconds_short" data-i18n-seconds="60"></button></td>
+                    <td class="w50" colspan="3"><button id="ctrlStop" class="stop-btn" onclick="window.opener.ceaseFire();" data-i18n="controls.emergency_stop"></button></td>
                 </tr>
                 <tr>
-                    <td><button onclick="window.opener.setTime2(80);" data-i18n="6e7c53cb-4dd0-4376-92ea-d6392a309be4" data-i18n-seconds="80"></button></td>
-                    <td><button onclick="window.opener.setTime2(120);" data-i18n="6e7c53cb-4dd0-4376-92ea-d6392a309be4" data-i18n-seconds="120"></button></td>
+                    <td><button onclick="window.opener.setTime2(80);" data-i18n="misc.seconds_short" data-i18n-seconds="80"></button></td>
+                    <td><button onclick="window.opener.setTime2(120);" data-i18n="misc.seconds_short" data-i18n-seconds="120"></button></td>
                     <td class="abcd"><button onclick="window.opener.toggleABCD2('1');">AB</button></td>
                     <td class="abcd"><button onclick="window.opener.toggleABCD2('2');">CD</button></td>
-                    <td class="abcd"><button onclick="window.opener.toggleABCD2('3');" data-i18n="1caf0e11-f363-4555-9c97-dd0b9877e483"></button></td>
+                    <td class="abcd"><button onclick="window.opener.toggleABCD2('3');" data-i18n="misc.all"></button></td>
                 </tr>
                 <tr>
-                    <td><button onclick="window.opener.setTime2(160);" data-i18n="6e7c53cb-4dd0-4376-92ea-d6392a309be4" data-i18n-seconds="160"></button></td>
-                    <td><button onclick="window.opener.setTime2(180);" data-i18n="6e7c53cb-4dd0-4376-92ea-d6392a309be4" data-i18n-seconds="180"></button></td>
-                    <td class="w50" colspan="3"><button onclick="window.opener.toggleDecimal();" class="tctrl" data-i18n="03baa248-d587-4e20-88dd-93d95172b82a"></button></td>
+                    <td><button onclick="window.opener.setTime2(160);" data-i18n="misc.seconds_short" data-i18n-seconds="160"></button></td>
+                    <td><button onclick="window.opener.setTime2(180);" data-i18n="misc.seconds_short" data-i18n-seconds="180"></button></td>
+                    <td class="w50" colspan="3"><button onclick="window.opener.toggleDecimal();" class="tctrl" data-i18n="misc.toggle_tenths"></button></td>
                 </tr>
                 <tr>
-                    <td><button onclick="window.opener.setTime2(200);" data-i18n="6e7c53cb-4dd0-4376-92ea-d6392a309be4" data-i18n-seconds="200"></button></td>
-                    <td><button onclick="window.opener.setTime2(240);" data-i18n="6e7c53cb-4dd0-4376-92ea-d6392a309be4" data-i18n-seconds="240"></button></td>
-                    <td class="w50" colspan="3"><button onclick="window.opener.toggleControls();" class="tctrl" data-i18n="2337ff0f-9840-44fd-8ac3-529034132604"></button></td>
+                    <td><button onclick="window.opener.setTime2(200);" data-i18n="misc.seconds_short" data-i18n-seconds="200"></button></td>
+                    <td><button onclick="window.opener.setTime2(240);" data-i18n="misc.seconds_short" data-i18n-seconds="240"></button></td>
+                    <td class="w50" colspan="3"><button onclick="window.opener.toggleControls();" class="tctrl" data-i18n="misc.toggle_main_controls"></button></td>
                 </tr>
             </tbody>
         </table>

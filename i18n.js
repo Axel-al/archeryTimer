@@ -1,136 +1,139 @@
-/* 
+/*
 GUIDE FOR TRANSLATORS:
 -----------------------------------
 Lines starting with double forward slashes are COMMENTS. These are there to
 aid you as a translator, and are not displayed on any part of the timer,
 hence they should not be translated.
 
-Each of the lines that are prepared for translation begin with a quoted
-string of hexadecimal characters (numbers 0 through 9 and letters A through F),
-divided into blocks of 8, 4, 4, 4 and 12, i.e.
-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX. These are unique identifiers used by the
-timer software and must not be altered in any way. These strings are followed
-by a colon, and then a quoted string, which is the string that should be
-translated. E.g. take the following example:
+All translatable lines use human-readable keys in dot notation
+(example: "controls.primary.start"). These keys are used by the timer software
+and must not be altered.
 
-    "78e23400-3a88-4271-9310-e2af36837c8d": "How to use the timer",
-
-In the above case, the text "How to use the timer" is the text that is to be
-translated, nothing else.
-
-Some lines contain placeholders. Placeholders take the form of a percent sign
-and one or more words (in CamelCase) wrapped in curly brackets. The contents
-of these placeholders give you an indication of what they will be replaced
-with when displayed in the timer, but they must not be translated themselves.
-An example of a placeholder looks like this:
-
-    "The woodcutter's house was made of {%Material}."
-
-In this case, {%Material} is a placeholder that refers to some form of
-building material. Translate this as if {%Material} is replaced with
-e.g. "wood", "bricks" or "clay".
-
-Should you have any questions, feel free to get in touch at
-http://varden.info/contact.php
-
-Finished translations should also be submitted there.
-Thank you very much for your contribution!
- */
+Some lines contain placeholders. Placeholders take the form {%Something} or
+{%$some.translation.key}. Keep placeholders intact and only translate the
+surrounding text.
+*/
 
 var i18n = {
     enUS: {
-        // These buttons appear on the timer display itself.
-        "176cd88e-ad14-4a8b-9633-c8257ad35d92": "Start / continue",
-        "2e507705-99cb-4d92-8fa7-436e32b67083": "Emergency stop",
-        
-        // Instructions for use:
-        "78e23400-3a88-4271-9310-e2af36837c8d": "How to use the timer",
-        // {%AB} and {%CD} are replaced by "AB" and "CD" respectively by the timer.
-        "ec50e48a-2cfd-4b19-bdbc-161aef491f82": "Click on {%AB} or {%CD} to toggle which line of archers shoots first.",
-        "17a7b876-4cae-4032-ad70-f1b0331afa8b": "Leave blank if there is just one line of archers.",
-        // {%RemainingTime} refers to the number of seconds displayed on the timer. By default, this is "120.0" in red color.
-        "64141455-4ad9-4968-ae2a-2cdb1d6f893b": "Click on {%RemainingTime} to change the time limit (10-240 seconds).",
-        // {%StartContinue} will be replaced by "Start / continue" from above.
-        "b6f9447d-542f-497f-b006-0a09ef6743e0": "Click on {%StartContinue} to start or advance the timer.",
-        // The same goes for {%EmergencyStop} and "Emergency stop" here.
-        "91eafab3-1e35-488d-a24e-f5c5c9cc96c7": "Click on {%EmergencyStop} to halt the timer immediately.",
-        // {%ControlPanel} is replaced by the text on the following line. Translate as if it said "more advanced control panel".
-        "b9c6b8b2-41c2-479d-87ee-50ebb1d1ee2f": "You can alternatively control the timer using a {%ControlPanel}. You can keep this on your laptop's screen while keeping the timer itself on a separate display or projector.",
-        "101c2c75-00a7-44de-b922-4af7eeec0d24": "more advanced control panel",
-        "f1f31ca2-56f0-4a86-a92a-2a1ab120058b": "Continue to the timer »",
-        
-        // Disclaimers:
-        "d3fff53a-9f70-40ea-ae6a-da502f71d8af": "Important - read this",
-        "2397d0ed-76f1-4fce-9db5-842367645a43": "In order for this timer to be used in competitions and tournaments, the timer's audial beeping needs to be in sync with the time visible on the display. Unfortunately, this doesn't always work in all web browsers. Make sure to verify that the audial beeping is in sync with the displayed time, and that the beeping does not lag behind the displayed time, before using this timer in a competition or tournament. If the beeping does in fact lag behind the displayed time, the timer may not be used as an official timer in competitions and tournaments. You may try to run this timer in another web browser if that is the case.",
-        // Warning: The following line may have some legal significance. Be sure you translate it correctly. As above, {%GetInTouch} is replaced by the text on the following line.
-        "d26303e6-24d7-40cb-a8c2-29dce048ecdb": "Disclaimer: Use of this timer is at your own risk. The developer is not to be held responsible for any injuries, damages, malfunctions or errors arising out of the use or misuse of this application. If you do encounter any issues, feel free to {%GetInTouch}, and I will take a look at it.",
-        "5ef3857e-333b-4de0-9292-7ef432118520": "get in touch",
-        "ac1cb77e-01fd-4432-a185-01053bd5b611": "Accept and continue »",
-        
-        // {%Seconds} is replaced by the numbers 10, 20, 40, 80, 120, 160, 200 and 240. The string is visible on the control panel for the timer (ctrlpanel.html); buttons with these numbers are used to set the amount of time remaining on the timer. This is short hand. Imagine you would say "the train leaves in 30 seconds". You can shorten it down to "the train leaves in 30s". With a placeholder, it would be "the train leaves in {%Seconds}s". Translate as if this is the case.
-        "6e7c53cb-4dd0-4376-92ea-d6392a309be4": "{%Seconds}s",
-        // "All" means all archers shoot at the same time, i.e. there is no AB/CD configuration.
-        "1caf0e11-f363-4555-9c97-dd0b9877e483": "All",
-        // Turns on/off controls on the main timer display (the one that the archers see).
-        "2337ff0f-9840-44fd-8ac3-529034132604": "Toggle main display controls",
-        // Turns on/off the display of tenths of a second on the display.
-        "03baa248-d587-4e20-88dd-93d95172b82a": "Show/hide tenths of seconds"
+        // Main controls on the timer display
+        "controls.primary.start": "Start",
+        "controls.primary.resume": "Resume",
+        "controls.primary.finish_round": "Finish round",
+        "controls.emergency_stop": "Emergency stop",
+        "controls.invert_colors": "Invert colors",
+        "controls.volume": "Volume",
+        "controls.help_language": "Help / language",
+        "controls.options": "Options",
+        "controls.close": "Close",
+        "controls.preparation_seconds": "Preparation time (s):",
+        "controls.fullscreen": "Fullscreen",
+        "controls.exit_fullscreen": "Exit fullscreen",
+
+        // Help panel
+        "help.title": "How to use the timer",
+        "help.usage.abcd_order_line": "Click {%AB} / {%CD} to choose the alternating shooting order for the current volley.",
+        "help.usage.single_line_hint": "If everyone shoots on one line, leave the default AB/CD hint (all archers together).",
+        "help.usage.timer_limit_line": "The central {%RemainingTime} display shows the active timer (preparation, then shooting).",
+        "help.usage.start_continue_line": "Use {%Start} / {%Resume} / {%Finish} to start, resume after an emergency pause, or finish the current volley immediately.",
+        "help.usage.emergency_stop_line": "Use {%EmergencyStop} to pause the timer immediately and keep the current remaining time.",
+        "help.usage.control_panel_line": "Open the {%ControlPanel} to set round duration buttons (10-240s), AB/CD mode, tenths display, and main control visibility.",
+        "help.usage.control_panel_label": "advanced control panel",
+        "help.tokens.remaining_time": "remaining time",
+        "help.language_label": "Change language:",
+
+        // Feedback and hints
+        "feedback.prep_applied": "Preparation: {value}s (applied)",
+        "feedback.prep_invalid": "Invalid value: minimum 3 seconds.",
+        "hints.abcd_click": "AB/CD",
+
+        // Control panel popup labels
+        "misc.seconds_short": "{%Seconds}s",
+        "misc.all": "All",
+        "misc.toggle_tenths": "Show/hide tenths of seconds",
+        "misc.toggle_main_controls": "Toggle main display controls"
     },
     frFR: {
-        "176cd88e-ad14-4a8b-9633-c8257ad35d92": "Démarrer / continuer",
-        "2e507705-99cb-4d92-8fa7-436e32b67083": "Pause d'urgence",
-        
-        "78e23400-3a88-4271-9310-e2af36837c8d": "Comment utiliser le timer",
-        "ec50e48a-2cfd-4b19-bdbc-161aef491f82": "Cliquer sur {%AB} ou {%CD} pour sélectionner quel ligne d'archers tire en premier.",
-        "17a7b876-4cae-4032-ad70-f1b0331afa8b": "Laisser vide si il y a juste une ligne d'archers.",
-        "64141455-4ad9-4968-ae2a-2cdb1d6f893b": "Cliquer sur {%RemainingTime} pour changer la limite de temps (10-240 secondes).",
-        "b6f9447d-542f-497f-b006-0a09ef6743e0": "Cliquer sur {%StartContinue} pour démarrer ou relancer le timer.",
-        "91eafab3-1e35-488d-a24e-f5c5c9cc96c7": "Cliquer sur {%EmergencyStop} pour mettre en pause le timer immédiatement.",
-        "b9c6b8b2-41c2-479d-87ee-50ebb1d1ee2f": "Alternativement, vous pouvez controler le timer en utilisant un {%ControlPanel}. Vous pouvez le garder sur l'écran de votre PC tout en gardant le timer sur un écran séparé ou un projecteur.",
-        "101c2c75-00a7-44de-b922-4af7eeec0d24": "panneau de contrôl plus avancé",
-        "f1f31ca2-56f0-4a86-a92a-2a1ab120058b": "Continuer au timer »",
-        
-        "d3fff53a-9f70-40ea-ae6a-da502f71d8af": "Important - à lire",
-        "2397d0ed-76f1-4fce-9db5-842367645a43": "Pour que ce timer soir utilisé dans les compétitions et les tournois, le bip sonore a besoin d'être synchronisé avec le temps visible sur l'écran. Malheureusement, ce n'est pas toujours le cas dans tous les navigateurs. Soyez sûr de vérifier que le bip sonore est synchronisé avec le temps affiché, et qu'il ne soit pas en retard avant d'utilisé le timer en compétition ou en tournoi. Si le bip est en retard avec le temps affiché, le timer pourrait ne pas pouvoir être utilisé comme timer officiel en compétitions et en tournois. Vous pourriez essayer de lancer le timer dans un autre navigateur si c'est le cas.",
-        "d26303e6-24d7-40cb-a8c2-29dce048ecdb": "Attention : L'usage de ce timer est à vos propres risques. Le développeur ne peut être tenu responsable de blessures, dommages, malfonctions, ou erreurs résultant de l'usage ou de la mauvaise utilisation de cette application. Si vous rencontrer n'importe quel problèmes, n'hésitez pas à {%GetInTouch}, et j'y jetterai un coup d'oeil.",
-        "5ef3857e-333b-4de0-9292-7ef432118520": "me contacter",
-        "ac1cb77e-01fd-4432-a185-01053bd5b611": "Accepter et continuer »",
-        
-        "6e7c53cb-4dd0-4376-92ea-d6392a309be4": "{%Seconds}s",
-        "1caf0e11-f363-4555-9c97-dd0b9877e483": "Tous",
-        "2337ff0f-9840-44fd-8ac3-529034132604": "Activer les contrôles sur l'écran principale",
-        "03baa248-d587-4e20-88dd-93d95172b82a": "Montrer/cacher les dixièmes de secondes"
+        // Contrôles principaux sur l"écran du timer
+        "controls.primary.start": "Démarrer",
+        "controls.primary.resume": "Reprendre",
+        "controls.primary.finish_round": "Finir la volée",
+        "controls.emergency_stop": "Pause d'urgence",
+        "controls.invert_colors": "Inverser les couleurs",
+        "controls.volume": "Volume",
+        "controls.help_language": "Aide / langue",
+        "controls.options": "Options",
+        "controls.close": "Fermer",
+        "controls.preparation_seconds": "Temps de préparation (s) :",
+        "controls.fullscreen": "Plein écran",
+        "controls.exit_fullscreen": "Quitter le plein écran",
+
+        // Panneau d"aide
+        "help.title": "Comment utiliser le timer",
+        "help.usage.abcd_order_line": "Cliquez sur {%AB} / {%CD} pour choisir l'ordre alterné des tireurs pour la volée en cours.",
+        "help.usage.single_line_hint": "S'il n'y a qu'une seule ligne de tir, laissez l'indication AB/CD par défaut (tous les archers ensemble).",
+        "help.usage.timer_limit_line": "L'affichage central {%RemainingTime} montre le timer actif (préparation puis tir).",
+        "help.usage.start_continue_line": "Utilisez {%Start} / {%Resume} / {%Finish} pour démarrer, reprendre après une pause d'urgence ou terminer immédiatement la volée en cours.",
+        "help.usage.emergency_stop_line": "Utilisez {%EmergencyStop} pour mettre en pause le timer immédiatement en conservant le temps restant.",
+        "help.usage.control_panel_line": "Ouvrez le {%ControlPanel} pour régler les durées de volée (10-240 s), le mode AB/CD, l'affichage des dixièmes et la visibilité des contrôles principaux.",
+        "help.usage.control_panel_label": "panneau de contrôle avancé",
+        "help.tokens.remaining_time": "temps restant",
+        "help.language_label": "Changer la langue :",
+
+        // Feedback et indices
+        "feedback.prep_applied": "Préparation : {value}s (appliqué)",
+        "feedback.prep_invalid": "Valeur invalide : minimum 3 secondes.",
+        "hints.abcd_click": "AB/CD",
+
+        // Libellés du panneau de contrôle popup
+        "misc.seconds_short": "{%Seconds}s",
+        "misc.all": "Tous",
+        "misc.toggle_tenths": "Afficher/masquer les dixièmes de seconde",
+        "misc.toggle_main_controls": "Afficher/masquer les contrôles de l'écran principal"
     },
     nbNO: {
-        "176cd88e-ad14-4a8b-9633-c8257ad35d92": "Start / fortsett",
-        "2e507705-99cb-4d92-8fa7-436e32b67083": "Nødstopp",
-        "78e23400-3a88-4271-9310-e2af36837c8d": "Slik bruker du klokka",
-        "ec50e48a-2cfd-4b19-bdbc-161aef491f82": "Klikk på {%AB} eller {%CD} for å velge hvilke skyttere som skyter først.",
-        "17a7b876-4cae-4032-ad70-f1b0331afa8b": "La feltet stå tomt dersom det ikke er AB/CD-inndeling.",
-        "64141455-4ad9-4968-ae2a-2cdb1d6f893b": "Klikk på {%RemainingTime} for å velge tidsbegrensning (10-240 sekunder).",
-        "b6f9447d-542f-497f-b006-0a09ef6743e0": "Klikk på {%StartContinue} for å starte klokka eller fortsette til neste runde.",
-        "91eafab3-1e35-488d-a24e-f5c5c9cc96c7": "Klikk på {%EmergencyStop} for å stoppe klokka umiddelbart.",
-        "b9c6b8b2-41c2-479d-87ee-50ebb1d1ee2f": "Alternativt kan du styre klokka med et {%ControlPanel}. Du kan ha dette på den bærbare PC-skjermen mens selve klokka vises på en ekstern skjerm eller projektor.",
-        "101c2c75-00a7-44de-b922-4af7eeec0d24": "mer avansert kontrollpanel",
-        "f1f31ca2-56f0-4a86-a92a-2a1ab120058b": "Fortsett til klokka »",
-        
-        "d3fff53a-9f70-40ea-ae6a-da502f71d8af": "Viktig - les dette",
-        "2397d0ed-76f1-4fce-9db5-842367645a43": "For at denne klokka skal kunne brukes på stevner og konkurranser, er det viktig at klokkas lydsignaler er synkrone med tiden som vises på displayet. Dette virker dessverre ikke alltid i alle nettlesere. Sørg for at du tester at lydsignalene på klokka er synkrone med tiden som vises i displayet, og at det ikke er forsinkelser på lydsignalene, før du bruker denne klokka på et stevne eller en konkurranse. Hvis lydsignalene henger etter tiden som vises på displayet, kan ikke denne klokka brukes som offisiell tidtaker på stevner eller konkurranser. Du kan i så fall prøve å bruke klokka i en annen nettleser.",
-        "d26303e6-24d7-40cb-a8c2-29dce048ecdb": "Ansvarsfraskrivelse: Bruk av denne klokka skjer på eget ansvar. Utvikleren skal ikke holdes ansvarlig for eventuelle skader, feil eller mangler som oppstår gjennom bruk eller misbruk av denne programvaren. Dersom det oppstår problemer, {%GetInTouch}, så skal jeg ta en titt på det.",
-        "5ef3857e-333b-4de0-9292-7ef432118520": "ta gjerne kontakt",
-        "ac1cb77e-01fd-4432-a185-01053bd5b611": "Godta og fortsett »",
-        
-        "6e7c53cb-4dd0-4376-92ea-d6392a309be4": "{%Seconds}s",
-        "1caf0e11-f363-4555-9c97-dd0b9877e483": "Alle",
-        "2337ff0f-9840-44fd-8ac3-529034132604": "Hoveddisplaykontroller av/på",
-        "03baa248-d587-4e20-88dd-93d95172b82a": "Vis/skjul tidelssekunder"
-    }
-}
+        // Hovedkontroller på timeren
+        "controls.primary.start": "Start",
+        "controls.primary.resume": "Fortsett",
+        "controls.primary.finish_round": "Avslutt serie",
+        "controls.emergency_stop": "Nødstopp",
+        "controls.invert_colors": "Inverter farger",
+        "controls.volume": "Volum",
+        "controls.help_language": "Hjelp / språk",
+        "controls.options": "Alternativer",
+        "controls.close": "Lukk",
+        "controls.preparation_seconds": "Forberedelsestid (s):",
+        "controls.fullscreen": "Fullskjerm",
+        "controls.exit_fullscreen": "Avslutt fullskjerm",
 
+        // Hjelpepanelet
+        "help.title": "Slik bruker du timeren",
+        "help.usage.abcd_order_line": "Klikk {%AB} / {%CD} for å velge vekslende skyterekkefølge for aktiv serie.",
+        "help.usage.single_line_hint": "Hvis alle skyter på en linje, behold standard AB/CD-hint (alle skyttere samlet).",
+        "help.usage.timer_limit_line": "Det sentrale {%RemainingTime}-feltet viser timeren som er i gang (forberedelse, deretter skyting).",
+        "help.usage.start_continue_line": "Bruk {%Start} / {%Resume} / {%Finish} for å starte, fortsette etter nødstopp eller avslutte serien umiddelbart.",
+        "help.usage.emergency_stop_line": "Bruk {%EmergencyStop} for å stoppe timeren umiddelbart og beholde gjenværende tid.",
+        "help.usage.control_panel_line": "Åpne {%ControlPanel} for å sette serietider (10-240 s), AB/CD-modus, tideler-visning og synlighet for hovedkontroller.",
+        "help.usage.control_panel_label": "avansert kontrollpanel",
+        "help.tokens.remaining_time": "gjenværende tid",
+        "help.language_label": "Bytt språk:",
+
+        // Tilbakemelding og hint
+        "feedback.prep_applied": "Forberedelse: {value}s (oppdatert)",
+        "feedback.prep_invalid": "Ugyldig verdi: minst 3 sekunder.",
+        "hints.abcd_click": "AB/CD",
+
+        // Etiketter i popup-kontrollpanelet
+        "misc.seconds_short": "{%Seconds}s",
+        "misc.all": "Alle",
+        "misc.toggle_tenths": "Vis/skjul tideler",
+        "misc.toggle_main_controls": "Vis/skjul hovedkontroller"
+    }
+};
 
 // Set default language by language type
 var defaultLanguage = {
     en: "enUS",
     fr: "frFR",
     nb: "nbNO"
-}
+};
