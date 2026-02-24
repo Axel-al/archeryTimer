@@ -757,29 +757,33 @@ function showCtrlPanel() {
         return;
     }
 
-    state.ctrlPanelWindow = opened;
+    var monitoredWindow = opened;
+    state.ctrlPanelWindow = monitoredWindow;
 
     if (!state.controlsHidden) {
         state.ctrlPanelAutoHidden = true;
         setControlsHidden(true);
-    } else {
-        state.ctrlPanelAutoHidden = false;
     }
     render();
 
-    if (state.ctrlPanelWindow.addEventListener) {
-        state.ctrlPanelWindow.addEventListener('blur', function() {
-            closeCtrlPanel();
+    if (monitoredWindow.addEventListener) {
+        monitoredWindow.addEventListener('blur', function() {
+            if (!monitoredWindow.closed) {
+                monitoredWindow.close();
+            }
         });
     }
 
     var checkClosed = window.setInterval(function() {
-        if (!state.ctrlPanelWindow || state.ctrlPanelWindow.closed) {
+        if (monitoredWindow.closed) {
             window.clearInterval(checkClosed);
-            if (state.ctrlPanelAutoHidden) {
-                setControlsHidden(false);
-                state.ctrlPanelAutoHidden = false;
-                render();
+            if (state.ctrlPanelWindow === monitoredWindow) {
+                state.ctrlPanelWindow = null;
+                if (state.ctrlPanelAutoHidden) {
+                    setControlsHidden(false);
+                    state.ctrlPanelAutoHidden = false;
+                    render();
+                }
             }
         }
     }, 250);
