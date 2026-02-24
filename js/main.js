@@ -752,7 +752,7 @@ function showCtrlPanel() {
         return;
     }
 
-    var opened = window.open('ctrlpanel.html', '_blank', 'height=280,width=650');
+    var opened = window.open('/pages/ctrlpanel.html', '_blank', 'height=280,width=650');
     if (!opened) {
         return;
     }
