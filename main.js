@@ -1,78 +1,734 @@
-var beep1;
-var beep2;
-var beep3;
-var cease;
-var startSound; // Ajoutez cette ligne
+var COLORS = {
+    idle: '#f00',
+    active: '#0f0',
+    low: '#ffa500'
+};
 
-var body;
-var timer;
-var abcd;
+var PHASE_CLASS_MAP = {
+    prep: 'phase-prep',
+    shoot: 'phase-shoot',
+    low: 'phase-low'
+};
 
-var ival = -1;
-var start = -1;
-var total = 120;
-var started = false;
-var lowtime = false;
-var timediff = 0;
+var state = {
+    intervalId: -1,
+    cycleStartMs: 0,
+    pausedElapsedMs: 0,
+    totalSeconds: 120,
+    prepSeconds: 20,
+    useABCD: false,
+    onCD: false,
+    flipCD: false,
+    useDecimal: false,
+    controlsHidden: false,
+    language: 'frFR',
+    inversedColors: false,
+    shootStarted: false,
+    lowTimeReached: false,
+    prepCuePlayed: false,
+    volumePercent: 100,
+    prepFeedbackTimeout: null,
+    ctrlPanelWindow: null,
+    ctrlPanelAutoHidden: false
+};
 
-var useabcd = true;
-var oncd = false;
-var flipcd = false;
-var usedecimal = false;
-var overlayhidden = true;
+var dom = {
+    body: null,
+    timer: null,
+    abcd: null,
+    maintimer: null,
+    controls: null,
+    startAction: null,
+    stopAction: null,
+    toggleColors: null,
+    prepTime: null,
+    prepFeedback: null,
+    volumeSlider: null,
+    volumeValue: null,
+    helpPanel: null,
+    fullscreenButton: null,
+    optionsButton: null,
+    helpButton: null,
+    beep1: null,
+    beep2: null,
+    beep3: null,
+    cease: null,
+    startSound: null
+};
 
-var ctrlhidden = false;
-var language = "frFR";
+function readDom() {
+    dom.body = document.body;
+    dom.timer = document.getElementById('timer');
+    dom.abcd = document.getElementById('abcd');
+    dom.maintimer = document.getElementById('maintimer');
+    dom.controls = document.getElementById('osccontrols');
+    dom.startAction = document.getElementById('startAction');
+    dom.stopAction = document.getElementById('stopAction');
+    dom.toggleColors = document.getElementById('toggleColors');
+    dom.prepTime = document.getElementById('prepTime');
+    dom.prepFeedback = document.getElementById('prepFeedback');
+    dom.volumeSlider = document.getElementById('volumeSlider');
+    dom.volumeValue = document.getElementById('volumeValue');
+    dom.helpPanel = document.getElementById('helpPanel');
+    dom.fullscreenButton = document.getElementById('fullscreenButton');
+    dom.optionsButton = document.getElementById('complexPanelButton');
+    dom.helpButton = document.getElementById('helpPanelButton');
+    dom.beep1 = document.getElementById('beep1');
+    dom.beep2 = document.getElementById('beep2');
+    dom.beep3 = document.getElementById('beep3');
+    dom.cease = document.getElementById('cease');
+    dom.startSound = document.getElementById('start');
+}
 
-var inversedColors = false;
-var ctrlPanelWindow = null;
+function safeInt(value, fallback) {
+    var parsed = parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
 
-window.addEventListener('load', function(e) {
-    if (typeof window.applicationCache != 'undefined') {
-        window.applicationCache.addEventListener('updateready', function(e2) {
-            if (window.applicationCache.status == window.applicationCache.UPDATEREADY && !overlayhidden) {
-                if (confirm('The archery timer software has been updated! Open latest version?')) {
-                    window.location.reload();
-                }
+function clampPrepSeconds(value) {
+    var next = safeInt(value, state.prepSeconds);
+    if (next < 3) {
+        return 3;
+    }
+    return next;
+}
+
+function updatePrepTimeFromInput(showFeedback) {
+    if (!dom.prepTime) {
+        return false;
+    }
+
+    var raw = String(dom.prepTime.value || '').trim();
+    if (raw === '') {
+        raw = '20';
+    }
+
+    var parsed = parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) {
+        showPrepFeedback(getI18NEntry('feedback.prep_invalid') || 'Valeur invalide: minimum 3 secondes.', true);
+        dom.prepTime.value = String(state.prepSeconds);
+        return false;
+    }
+
+    var next = clampPrepSeconds(parsed);
+    var changed = next !== state.prepSeconds;
+    state.prepSeconds = next;
+    dom.prepTime.value = String(state.prepSeconds);
+
+    if (showFeedback) {
+        var template = getI18NEntry('feedback.prep_applied') || 'Préparation: {value}s (appliqué)';
+        showPrepFeedback(template.replace('{value}', state.prepSeconds), false);
+    }
+
+    return changed;
+}
+
+function showPrepFeedback(message, isError) {
+    if (!dom.prepFeedback) {
+        return;
+    }
+
+    dom.prepFeedback.textContent = message;
+    dom.prepFeedback.classList.remove('prep-feedback-visible', 'prep-feedback-error');
+    if (isError) {
+        dom.prepFeedback.classList.add('prep-feedback-error');
+    }
+
+    void dom.prepFeedback.offsetWidth;
+    dom.prepFeedback.classList.add('prep-feedback-visible');
+
+    window.clearTimeout(state.prepFeedbackTimeout);
+    state.prepFeedbackTimeout = window.setTimeout(function() {
+        dom.prepFeedback.classList.remove('prep-feedback-visible');
+    }, 1800);
+}
+
+function isRunning() {
+    return state.intervalId !== -1;
+}
+
+function isPaused() {
+    return !isRunning() && state.pausedElapsedMs > 0;
+}
+
+function getNowMs() {
+    return new Date().getTime();
+}
+
+function getPrepMs() {
+    return state.prepSeconds * 1000;
+}
+
+function getShootMs() {
+    return state.totalSeconds * 1000;
+}
+
+function getRoundMs() {
+    return getPrepMs() + getShootMs();
+}
+
+function getElapsedMs(nowMs) {
+    if (isRunning()) {
+        return Math.max(0, nowMs - state.cycleStartMs);
+    }
+    return Math.max(0, state.pausedElapsedMs);
+}
+
+function getPhaseState(elapsedMs) {
+    var prepMs = getPrepMs();
+    var shootMs = getShootMs();
+
+    if (elapsedMs < prepMs) {
+        return {
+            phase: 'prep',
+            phaseElapsedMs: elapsedMs,
+            phaseRemainingMs: prepMs - elapsedMs,
+            shootElapsedMs: 0,
+            shootRemainingMs: shootMs
+        };
+    }
+
+    var shootElapsedMs = elapsedMs - prepMs;
+    var shootRemainingMs = Math.max(0, shootMs - shootElapsedMs);
+    return {
+        phase: 'shoot',
+        phaseElapsedMs: shootElapsedMs,
+        phaseRemainingMs: shootRemainingMs,
+        shootElapsedMs: shootElapsedMs,
+        shootRemainingMs: shootRemainingMs
+    };
+}
+
+function formatTimerValue(ms) {
+    if (state.useDecimal) {
+        var tenths = Math.max(0, Math.floor(ms / 100));
+        var whole = Math.floor(tenths / 10);
+        var decimal = tenths % 10;
+        return whole + '<small>.' + decimal + '</small>';
+    }
+    return String(Math.max(0, Math.ceil(ms / 1000)));
+}
+
+function getPhaseTone(phaseState) {
+    if (phaseState.phase === 'prep') {
+        return 'prep';
+    }
+    if (phaseState.shootRemainingMs <= 20000) {
+        return 'low';
+    }
+    return 'shoot';
+}
+
+function getABCDLabel() {
+    if (!state.useABCD) {
+        return '';
+    }
+
+    if (!state.flipCD) {
+        return state.onCD ? 'C<br />D' : 'A<br />B';
+    }
+    return state.onCD ? 'A<br />B' : 'C<br />D';
+}
+
+function getPrimaryActionState() {
+    if (isRunning()) {
+        return 'finish_round';
+    }
+    if (isPaused()) {
+        return 'resume';
+    }
+    return 'start';
+}
+
+function getPrimaryActionLabel() {
+    var actionState = getPrimaryActionState();
+    if (actionState === 'resume') {
+        return getI18NEntry('controls.primary.resume') || 'Reprendre';
+    }
+    if (actionState === 'finish_round') {
+        return getI18NEntry('controls.primary.finish_round') || 'Finir la volée';
+    }
+    return getI18NEntry('controls.primary.start') || 'Démarrer';
+}
+
+function stopSound(sound) {
+    if (!sound) {
+        return;
+    }
+    sound.pause();
+    sound.currentTime = 0;
+}
+
+function stopAllSounds(exceptSound) {
+    var sounds = [dom.beep1, dom.beep2, dom.beep3, dom.cease, dom.startSound];
+    for (var i = 0; i < sounds.length; i++) {
+        if (sounds[i] && sounds[i] !== exceptSound && !sounds[i].paused) {
+            stopSound(sounds[i]);
+        }
+    }
+}
+
+function playSound(sound) {
+    if (!sound) {
+        return;
+    }
+    stopAllSounds(sound);
+    sound.play();
+}
+
+function applyVolume() {
+    var level = Math.max(0, Math.min(100, state.volumePercent)) / 100;
+    var sounds = [dom.beep1, dom.beep2, dom.beep3, dom.cease, dom.startSound];
+    for (var i = 0; i < sounds.length; i++) {
+        if (sounds[i]) {
+            sounds[i].volume = level;
+        }
+    }
+}
+
+function setVolumePercent(value, persist) {
+    state.volumePercent = Math.max(0, Math.min(100, safeInt(value, state.volumePercent)));
+    applyVolume();
+
+    if (dom.volumeSlider) {
+        dom.volumeSlider.value = String(state.volumePercent);
+    }
+    if (dom.volumeValue) {
+        dom.volumeValue.textContent = state.volumePercent + '%';
+    }
+
+    if (persist) {
+        try {
+            localStorage.setItem('archeryTimer.volume', String(state.volumePercent));
+        } catch (error) {
+            // Ignore storage failures.
+        }
+    }
+}
+
+function setControlsHidden(hidden) {
+    state.controlsHidden = hidden;
+    if (!dom.body) {
+        return;
+    }
+    dom.body.classList.toggle('controls-hidden', hidden);
+}
+
+function syncFlagsFromElapsed(elapsedMs) {
+    var prepMs = getPrepMs();
+    state.shootStarted = elapsedMs >= prepMs;
+    state.lowTimeReached = elapsedMs >= (prepMs + Math.max(0, getShootMs() - 20000));
+    state.prepCuePlayed = elapsedMs >= Math.max(0, prepMs - 2000);
+}
+
+function applyPhaseClass(element, phaseTone) {
+    if (!element) {
+        return;
+    }
+    element.classList.remove(PHASE_CLASS_MAP.prep, PHASE_CLASS_MAP.shoot, PHASE_CLASS_MAP.low);
+    element.classList.add(PHASE_CLASS_MAP[phaseTone] || PHASE_CLASS_MAP.prep);
+}
+
+function renderTheme(phaseTone) {
+    if (!dom.body || !dom.timer) {
+        return;
+    }
+
+    dom.body.classList.toggle('theme-inversed', state.inversedColors);
+    dom.body.classList.toggle('theme-normal', !state.inversedColors);
+
+    applyPhaseClass(dom.body, phaseTone);
+    applyPhaseClass(dom.timer, phaseTone);
+}
+
+function isFullscreenActive() {
+    return !!document.fullscreenElement;
+}
+
+function setEmergencyStopLabel(label) {
+    if (!dom.stopAction) {
+        return;
+    }
+
+    var labels = dom.stopAction.querySelectorAll('.stop-label-layer');
+    for (var i = 0; i < labels.length; i++) {
+        labels[i].textContent = label;
+    }
+
+    dom.stopAction.setAttribute('aria-label', label);
+    var banner = dom.stopAction.querySelector('.stop-banner');
+    if (banner) {
+        banner.setAttribute('aria-label', label);
+    }
+}
+
+function renderActions() {
+    if (dom.startAction) {
+        dom.startAction.innerHTML = getPrimaryActionLabel();
+        dom.startAction.dataset.actionState = getPrimaryActionState();
+    }
+
+    if (dom.stopAction) {
+        var enabled = isRunning();
+        setEmergencyStopLabel(getI18NEntry('controls.emergency_stop') || "Pause d'urgence");
+        dom.stopAction.classList.toggle('disabled', !enabled);
+        dom.stopAction.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+    }
+
+    if (dom.fullscreenButton) {
+        var fullscreenLabel = isFullscreenActive()
+            ? (getI18NEntry('controls.exit_fullscreen') || 'Quitter le plein écran')
+            : (getI18NEntry('controls.fullscreen') || 'Plein écran');
+        dom.fullscreenButton.title = fullscreenLabel;
+        dom.fullscreenButton.setAttribute('aria-label', fullscreenLabel);
+        dom.fullscreenButton.classList.toggle('is-active', isFullscreenActive());
+    }
+}
+
+function renderABCD() {
+    if (!dom.abcd) {
+        return;
+    }
+
+    if (!state.useABCD) {
+        dom.abcd.innerHTML = '<span class="abcd-hint">' + (getI18NEntry('hints.abcd_click') || 'AB/CD') + '</span>';
+        return;
+    }
+
+    dom.abcd.innerHTML = getABCDLabel();
+}
+
+function renderTimer() {
+    if (!dom.timer) {
+        return;
+    }
+
+    if (!isRunning() && state.pausedElapsedMs === 0) {
+        dom.timer.innerHTML = state.useDecimal
+            ? state.totalSeconds + '<small>.0</small>'
+            : String(state.totalSeconds);
+        renderTheme('prep');
+        return;
+    }
+
+    var elapsedMs = getElapsedMs(getNowMs());
+    var phaseState = getPhaseState(elapsedMs);
+    dom.timer.innerHTML = formatTimerValue(phaseState.phaseRemainingMs);
+    renderTheme(getPhaseTone(phaseState));
+}
+
+function render() {
+    if (!dom.body || !dom.timer) {
+        return;
+    }
+
+    if (dom.toggleColors) {
+        dom.toggleColors.checked = state.inversedColors;
+    }
+
+    renderTimer();
+    renderABCD();
+    renderActions();
+}
+
+function startLoop() {
+    if (isRunning()) {
+        return;
+    }
+    state.intervalId = window.setInterval(tick, 100);
+}
+
+function stopLoop() {
+    if (!isRunning()) {
+        return;
+    }
+    window.clearInterval(state.intervalId);
+    state.intervalId = -1;
+}
+
+function startNextLine() {
+    state.onCD = true;
+    state.cycleStartMs = getNowMs();
+    state.pausedElapsedMs = 0;
+    state.shootStarted = false;
+    state.lowTimeReached = false;
+    state.prepCuePlayed = false;
+    playSound(dom.beep2);
+    render();
+}
+
+function resetRound(playTone, flipSides) {
+    stopLoop();
+    state.pausedElapsedMs = 0;
+    state.onCD = false;
+    state.shootStarted = false;
+    state.lowTimeReached = false;
+    state.prepCuePlayed = false;
+
+    if (flipSides) {
+        state.flipCD = !state.flipCD;
+    }
+
+    if (playTone) {
+        playSound(dom.beep3);
+    }
+
+    render();
+}
+
+function tick() {
+    var nowMs = getNowMs();
+    var elapsedMs = nowMs - state.cycleStartMs;
+    var phaseState = getPhaseState(elapsedMs);
+
+    if (!state.prepCuePlayed && phaseState.phase === 'prep' && phaseState.phaseRemainingMs <= 3000 && phaseState.phaseRemainingMs > 2000) {
+        state.prepCuePlayed = true;
+        playSound(dom.startSound);
+    }
+
+    if (!state.shootStarted && phaseState.phase === 'shoot') {
+        state.shootStarted = true;
+        playSound(dom.beep1);
+    }
+
+    if (!state.lowTimeReached && phaseState.phase === 'shoot' && phaseState.shootRemainingMs <= 20000) {
+        state.lowTimeReached = true;
+    }
+
+    if (elapsedMs >= getRoundMs()) {
+        if (state.useABCD && !state.onCD) {
+            startNextLine();
+        } else {
+            resetRound(true, true);
+        }
+        return;
+    }
+
+    render();
+}
+
+function startTimer() {
+    updatePrepTimeFromInput(false);
+
+    if (isRunning()) {
+        if (state.useABCD && !state.onCD) {
+            startNextLine();
+        } else {
+            resetRound(true, true);
+        }
+        return;
+    }
+
+    var resumed = isPaused();
+    state.cycleStartMs = getNowMs() - state.pausedElapsedMs;
+    syncFlagsFromElapsed(state.pausedElapsedMs);
+    state.pausedElapsedMs = 0;
+
+    startLoop();
+    if (!resumed) {
+        playSound(dom.beep2);
+    }
+    render();
+}
+
+function ceaseFire() {
+    if (!isRunning()) {
+        return;
+    }
+
+    state.pausedElapsedMs = Math.max(0, getNowMs() - state.cycleStartMs);
+    syncFlagsFromElapsed(state.pausedElapsedMs);
+    stopLoop();
+    playSound(dom.cease);
+    render();
+}
+
+function pauseOrResumeTimer() {
+    if (isRunning()) {
+        ceaseFire();
+    } else {
+        startTimer();
+    }
+}
+
+function toggleABCD() {
+    if (state.controlsHidden || isRunning()) {
+        return;
+    }
+
+    if (!state.useABCD) {
+        state.useABCD = true;
+        state.flipCD = false;
+        state.onCD = false;
+    } else if (!state.flipCD) {
+        state.flipCD = true;
+    } else {
+        state.useABCD = false;
+        state.onCD = false;
+    }
+
+    render();
+}
+
+function toggleABCD2(mode) {
+    if (isRunning()) {
+        return;
+    }
+
+    if (mode === '1') {
+        state.useABCD = true;
+        state.flipCD = false;
+    } else if (mode === '2') {
+        state.useABCD = true;
+        state.flipCD = true;
+    } else if (mode === '3') {
+        state.useABCD = false;
+    }
+
+    state.onCD = false;
+    render();
+}
+
+function setABCD() {
+    if (isRunning()) {
+        return;
+    }
+    state.useABCD = !state.useABCD;
+    if (!state.useABCD) {
+        state.onCD = false;
+    }
+    render();
+}
+
+function setTime() {
+    if (state.controlsHidden || isRunning()) {
+        return;
+    }
+
+    switch (state.totalSeconds) {
+        case 10:
+            state.totalSeconds = 20;
+            break;
+        case 20:
+        case 40:
+        case 60:
+        case 160:
+        case 180:
+            state.totalSeconds += 20;
+            break;
+        case 80:
+        case 120:
+        case 200:
+            state.totalSeconds += 40;
+            break;
+        case 240:
+            state.totalSeconds = 10;
+            break;
+    }
+
+    state.pausedElapsedMs = 0;
+    render();
+}
+
+function setTime2(time) {
+    if (isRunning()) {
+        return;
+    }
+
+    state.totalSeconds = safeInt(time, state.totalSeconds);
+    state.pausedElapsedMs = 0;
+    render();
+}
+
+function toggleDecimal() {
+    if (isRunning()) {
+        return;
+    }
+
+    state.useDecimal = !state.useDecimal;
+    render();
+}
+
+function toggleControls() {
+    if (isRunning() && state.shootStarted) {
+        return;
+    }
+    setControlsHidden(!state.controlsHidden);
+    render();
+}
+
+function toggleInversedColors() {
+    if (!dom.toggleColors) {
+        return;
+    }
+
+    state.inversedColors = !!dom.toggleColors.checked;
+    try {
+        localStorage.setItem('archeryTimer.themeInversed', state.inversedColors ? '1' : '0');
+    } catch (error) {
+        // Ignore storage failures.
+    }
+
+    render();
+}
+
+function getI18NEntry(key) {
+    var languageArray = i18n[state.language] || i18n.frFR;
+    var fr = i18n.frFR;
+    return Object.prototype.hasOwnProperty.call(languageArray, key) ? languageArray[key] : fr[key];
+}
+
+function replaceI18NPlaceholders(str, node, languageArray, fallbackArray) {
+    var replaced = str;
+    var tags = replaced.match(/\{%\$?[\w.-]+\}/g);
+
+    while (tags !== null) {
+        for (var i = 0; i < tags.length; i++) {
+            var naked = tags[i].slice(2, -1).toLowerCase();
+            var value = '';
+
+            if (naked.substr(0, 1) === '$') {
+                var nestedKey = naked.substring(1);
+                value = Object.prototype.hasOwnProperty.call(languageArray, nestedKey) ? languageArray[nestedKey] : fallbackArray[nestedKey];
+            } else if (node) {
+                value = node.getAttribute('data-i18n-' + naked);
             }
-        }, false);
-    }
-}, false);
 
-document.addEventListener('keydown', function(event) {
-    if (event.code === 'Space') {
-        pauseOrResumeTimer();
+            if (typeof value !== 'string') {
+                value = '';
+            }
+            replaced = replaced.replace(tags[i], value);
+        }
+        tags = replaced.match(/\{%\$?[\w.-]+\}/g);
     }
-});
+
+    return replaced;
+}
 
 function localizeAndContinue(lang) {
-    language = lang;
-    var larr = i18n[lang];
-    var enus = i18n["frFR"];
-    var earr = document.querySelectorAll('[data-i18n]');
-    for (var i = 0; i < earr.length; i++) {
-        var uuid = earr[i].dataset.i18n;
-        var str = (larr.hasOwnProperty(uuid) ? larr[uuid] : enus[uuid]);
+    state.language = lang;
+    var languageArray = i18n[lang] || i18n.frFR;
+    var fr = i18n.frFR;
+    var elements = document.querySelectorAll('[data-i18n]');
+
+    for (var i = 0; i < elements.length; i++) {
+        var key = elements[i].dataset.i18n;
+        var str = Object.prototype.hasOwnProperty.call(languageArray, key) ? languageArray[key] : fr[key];
         if (Array.isArray(str)) {
             str = str[0];
         }
-        var tag = str.match(/\{%\$?[\w\-]+\}/g);
-        while (tag != null) {
-            for (var j = 0; j < tag.length; j++) {
-                var tagnaked = tag[j].slice(2, -1).toLowerCase();
-                str = str.replace(tag[j], (tagnaked.substr(0, 1) == "$" ? (larr.hasOwnProperty(tagnaked.substring(1)) ? larr[tagnaked.substring(1)] : enus[tagnaked.substring(1)]) : earr[i].getAttribute("data-i18n-" + tagnaked)));
-            }
-            tag = str.match(/\{%\$?[\w\-]+\}/g);
+        if (typeof str !== 'string') {
+            continue;
         }
-        earr[i].innerHTML = str;
-    }
-    hideOverlay('welcome');
-}
 
-function getI18NEntry(uuid) {
-    var larr = i18n[language];
-    var enus = i18n["frFR"];
-    return (larr.hasOwnProperty(uuid) ? larr[uuid] : enus[uuid]);
+        elements[i].innerHTML = replaceI18NPlaceholders(str, elements[i], languageArray, fr);
+    }
+
+    try {
+        localStorage.setItem('archeryTimer.language', state.language);
+    } catch (error) {
+        // Ignore storage failures.
+    }
 }
 
 function getI18NArray() {
@@ -80,337 +736,217 @@ function getI18NArray() {
 }
 
 function getLanguage() {
-    return language;
+    return state.language;
 }
 
-function hideOverlay(eid) {
-    overlayhidden = true;
-    var opacity = 1;
-    var overlay = document.getElementById(eid);
-    var hidetimer = setInterval(function () {
-        if (opacity <= 0.0){
-            clearInterval(hidetimer);
-            overlay.style.display = 'none';
-        }
-        overlay.style.opacity = opacity;
-        overlay.style.filter = 'alpha(opacity=' + opacity * 100 + ")";
-        opacity -= 0.05;
-    }, 25);
+function closeCtrlPanel() {
+    if (state.ctrlPanelWindow && !state.ctrlPanelWindow.closed) {
+        state.ctrlPanelWindow.close();
+    }
 }
 
 function showCtrlPanel() {
-    if (ctrlPanelWindow == null || ctrlPanelWindow.closed) {
-        ctrlPanelWindow = window.open('ctrlpanel.html', '_blank', 'height=280,width=650');
-        hideOverlay('overlay');
-        hideOverlay('github-fork');
-        toggleControls();
-        
-        // Ajouter un intervalle pour vérifier si la fenêtre est fermée
-        var checkCtrlPanelClosed = setInterval(function() {
-            if (ctrlPanelWindow.closed) {
-                clearInterval(checkCtrlPanelClosed);
-                toggleControls();
-            }
-        }, 250);
+    if (state.ctrlPanelWindow && !state.ctrlPanelWindow.closed) {
+        state.ctrlPanelWindow.focus();
+        return;
+    }
 
-        // Ajouter un écouteur d'événement pour fermer la fenêtre lorsqu'elle perd le focus
-        ctrlPanelWindow.addEventListener('blur', function() {
-            ctrlPanelWindow.close();
-        });
+    var opened = window.open('ctrlpanel.html', '_blank', 'height=280,width=650');
+    if (!opened) {
+        return;
+    }
+
+    state.ctrlPanelWindow = opened;
+
+    if (!state.controlsHidden) {
+        state.ctrlPanelAutoHidden = true;
+        setControlsHidden(true);
     } else {
-        ctrlPanelWindow.focus();
+        state.ctrlPanelAutoHidden = false;
+    }
+    render();
+
+    if (state.ctrlPanelWindow.addEventListener) {
+        state.ctrlPanelWindow.addEventListener('blur', function() {
+            closeCtrlPanel();
+        });
+    }
+
+    var checkClosed = window.setInterval(function() {
+        if (!state.ctrlPanelWindow || state.ctrlPanelWindow.closed) {
+            window.clearInterval(checkClosed);
+            if (state.ctrlPanelAutoHidden) {
+                setControlsHidden(false);
+                state.ctrlPanelAutoHidden = false;
+                render();
+            }
+        }
+    }, 250);
+}
+
+function toggleHelpPanel(forceOpen) {
+    if (!dom.helpPanel) {
+        return;
+    }
+
+    var shouldOpen = typeof forceOpen === 'boolean'
+        ? forceOpen
+        : dom.helpPanel.classList.contains('hidden');
+
+    dom.helpPanel.classList.toggle('hidden', !shouldOpen);
+    dom.helpPanel.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+}
+
+function setLanguage(lang) {
+    if (!i18n[lang]) {
+        return;
+    }
+    localizeAndContinue(lang);
+    render();
+}
+
+function getUiSnapshot() {
+    return {
+        primaryActionState: getPrimaryActionState(),
+        primaryActionLabel: getPrimaryActionLabel(),
+        emergencyEnabled: isRunning(),
+        inversedColors: state.inversedColors,
+        language: state.language
+    };
+}
+
+function toggleFullscreen() {
+    var root = document.documentElement;
+    if (!isFullscreenActive()) {
+        if (root.requestFullscreen) {
+            root.requestFullscreen();
+        }
+    } else if (document.exitFullscreen) {
+        document.exitFullscreen();
     }
 }
 
-// Fermer le popup ctrlpanel si la page principale est actualisée ou fermée
-window.addEventListener('beforeunload', function() {
-    if (ctrlPanelWindow && !ctrlPanelWindow.closed) {
-        ctrlPanelWindow.close();
+function canHandleSpacebar(event) {
+    var target = event.target;
+    if (!target) {
+        return true;
     }
+    var tag = target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON') {
+        return false;
+    }
+    return !target.isContentEditable;
+}
+
+document.addEventListener('keydown', function(event) {
+    if (event.code === 'Space' && canHandleSpacebar(event)) {
+        event.preventDefault();
+        pauseOrResumeTimer();
+        return;
+    }
+
+    if (event.code === 'Escape' && dom.helpPanel && !dom.helpPanel.classList.contains('hidden')) {
+        toggleHelpPanel(false);
+    }
+});
+
+window.addEventListener('beforeunload', function() {
+    closeCtrlPanel();
 });
 
 window.addEventListener('unload', function() {
-    if (ctrlPanelWindow && !ctrlPanelWindow.closed) {
-        ctrlPanelWindow.close();
-    }
+    closeCtrlPanel();
 });
 
-function toggleControls() {
-    if (started) return;
-    if (ctrlhidden) {
-        ctrlhidden = false;
-        document.getElementById("osccontrols").style.display = "block";
-        var maintimer = document.getElementById("maintimer");
-        maintimer.style.position = "relative";
-        maintimer.style.top = "";
-        maintimer.style.transform = "";
-    } else {
-        ctrlhidden = true;
-        document.getElementById("osccontrols").style.display = "none";
-        var maintimer = document.getElementById("maintimer");
-        maintimer.style.position = "fixed";
-        maintimer.style.top = "50%";
-        maintimer.style.transform = "translateY(-50%)";
-    }
-}
+window.addEventListener('fullscreenchange', render);
 
-function stopSound(sound) {
-    sound.pause();
-    sound.currentTime = 0;
-}
+window.addEventListener('load', function() {
+    readDom();
 
-function stopAllSounds(sound) {
-    if (sound != beep1 && !beep1.paused) {
-        stopSound(beep1);
-    }
-    if (sound != beep2 && !beep2.paused) {
-        stopSound(beep2);
-    }
-    if (sound != beep3 && !beep3.paused) {
-        stopSound(beep3);
-    }
-    if (sound != cease && !cease.paused) {
-        stopSound(cease);
-    }
-    if (sound != startSound && !startSound.paused) {
-        stopSound(startSound);
-    }
-}
-
-function startTimer() {
-    if (ival == -1) {
-        start = new Date().getTime() - timediff;
-        var resumed = timediff != 0;
-        timediff = 0;
-        ival = setInterval(function() {
-            var prepTime = document.getElementById('prepTime').value;
-            prepTime = (prepTime == "" ? 20 : parseInt(prepTime));
-            var now = new Date().getTime();
-            var timeRemaining = (prepTime * 1000) - (now - start);
-
-            if (timeRemaining <= 3000 && timeRemaining > 2000 && !started) {
-                stopAllSounds(startSound);
-                startSound.play(); // Joue le son start.mp3
-            }
-
-            if (now - start >= (1000 * prepTime) && !started) {
-                started = true;
-                if (!inversedColors) {
-                    timer.style.color = '#0F0';
-                } else {
-                    body.style.backgroundColor = '#0F0';
-                }
-                beep1.play();
-            }
-            if (started && now - start >= (total * 1000) - 20000 && !lowtime) {
-                lowtime = true;
-                if (!inversedColors) {
-                    timer.style.color = '#ffa500';
-                } else {
-                    body.style.backgroundColor = '#ffa500';
-                }
-            }
-            var tds = (now - start < (prepTime * 1000) ? (prepTime - 1) : total + (prepTime - 1)) - Math.floor((now - start) / 1000);
-            var tdd = 9 - Math.floor(((now - start) / 100) % 10);
-            timer.innerHTML = (usedecimal ? tds + '<small>.' + tdd + '</small>' : (tds + 1));
-            if (now - start >= (total * 1000) + (prepTime * 1000)) {
-                if (useabcd && !oncd) {
-                    started = false;
-                    lowtime = false;
-                    oncd = true;
-                    start = new Date().getTime() - 100;
-                    if (!inversedColors) {
-                        timer.style.color = '#f00';
-                    } else {
-                        body.style.backgroundColor = '#f00';
-                    }
-                    timer.innerHTML = (usedecimal ? '9<small>.9</small>' : '10');
-                    abcd.innerHTML = (flipcd ? 'A<br />B' : 'C<br />D');
-                    stopAllSounds(beep2);
-                    beep2.play();
-                } else {
-                    reset(true);
-                }
-            }
-        }, 100);
-        if (!resumed) {
-            stopAllSounds(beep2);
-            beep2.play();
+    if (dom.prepTime) {
+        if (!dom.prepTime.value) {
+            dom.prepTime.value = String(state.prepSeconds);
         }
-    } else {
-        if (useabcd && !oncd) {
-            started = false;
-            lowtime = false;
-            oncd = true;
-            start = new Date().getTime() - 100;
-            if (!inversedColors) {
-                timer.style.color = '#f00';
-            } else {
-                body.style.backgroundColor = '#f00';
+        updatePrepTimeFromInput(false);
+        dom.prepTime.addEventListener('change', function() {
+            var changed = updatePrepTimeFromInput(true);
+            if (changed || isRunning()) {
+                render();
             }
-            timer.innerHTML = (usedecimal ? '9<small>.9</small>' : '10');
-            abcd.innerHTML = (flipcd ? 'A<br />B' : 'C<br />D');
-            stopAllSounds(beep2);
-            beep2.play();
+        });
+    }
+
+    if (dom.toggleColors) {
+        dom.toggleColors.addEventListener('change', toggleInversedColors);
+    }
+
+    if (dom.volumeSlider) {
+        dom.volumeSlider.addEventListener('input', function() {
+            setVolumePercent(dom.volumeSlider.value, true);
+        });
+    }
+
+    if (dom.fullscreenButton) {
+        dom.fullscreenButton.addEventListener('click', function() {
+            toggleFullscreen();
+        });
+    }
+
+    if (dom.helpButton) {
+        dom.helpButton.addEventListener('keydown', function(event) {
+            if (event.code === 'Escape') {
+                toggleHelpPanel(false);
+            }
+        });
+    }
+
+    try {
+        var storedLang = localStorage.getItem('archeryTimer.language');
+        if (storedLang && i18n[storedLang]) {
+            state.language = storedLang;
         } else {
-            reset(true);
+            var browserLang = (navigator.language || 'fr').slice(0, 2).toLowerCase();
+            if (Object.prototype.hasOwnProperty.call(defaultLanguage, browserLang)) {
+                state.language = defaultLanguage[browserLang];
+            }
         }
-    }
-}
 
-function reset(play) {
-    clearInterval(ival);
-    ival = -1;
-    started = false;
-    lowtime = false;
-    oncd = false;
-    if (!inversedColors) {
-        timer.style.color = '#f00';
-    } else {
-        body.style.backgroundColor = '#f00';
+        state.inversedColors = localStorage.getItem('archeryTimer.themeInversed') === '1';
+        var storedVolume = safeInt(localStorage.getItem('archeryTimer.volume'), state.volumePercent);
+        state.volumePercent = Math.max(0, Math.min(100, storedVolume));
+    } catch (error) {
+        // Ignore storage failures.
     }
-    flipcd = !flipcd;
-    if (play) {
-        timer.innerHTML = (usedecimal ? total + '<small>.0</small>' : total);
-        stopAllSounds(beep3);
-        beep3.play();
-    }
-}
 
-function toggleABCD() {
-    if (ctrlhidden) return;
-    if (ival == -1) {
-        if (useabcd && !flipcd) {
-            flipcd = true;
-            abcd.innerHTML = 'C<br />D';
-        } else if (!useabcd) {
-            setABCD();
-            flipcd = false;
-            abcd.innerHTML = 'A<br />B';
-        } else {
-            setABCD();
-        }
-    }
-}
+    setVolumePercent(state.volumePercent, false);
+    setControlsHidden(state.controlsHidden);
+    localizeAndContinue(state.language);
+    toggleABCD2('3');
 
-function toggleABCD2(mode) {
-    if (ival == -1) {
-        if (mode == '1') {
-            useabcd = true;
-            flipcd = false;
-            abcd.innerHTML = 'A<br />B';
-            abcd.style.display = 'block';
-        } else if (mode == '2') {
-            useabcd = true;
-            flipcd = true;
-            abcd.innerHTML = 'C<br />D';
-            abcd.style.display = 'block';
-        } else if (mode == '3') {
-            useabcd = false;
-            abcd.style.display = 'none';
-        }
+    if (dom.toggleColors) {
+        dom.toggleColors.checked = state.inversedColors;
     }
-}
 
-function setABCD() {
-    if (ival == -1) {
-        useabcd = !useabcd;
-        abcd.style.display = (useabcd ? 'block' : 'none');
-    }
-}
-
-function setTime() {
-    if (ctrlhidden) return;
-    if (ival == -1) {
-        switch (total) {
-            case 10:
-                total = 20;
-                break;
-            case 20:
-            case 40:
-            case 60:
-            case 160:
-            case 180:
-                total += 20;
-                break;
-            case 80:
-            case 120:
-            case 200:
-                total += 40;
-                break;
-            case 240:
-                total = 10;
-                break;
-        }
-        timer.innerHTML = (usedecimal ? total + '<small>.0</small>' : total);
-    }
-}
-
-function setTime2(time) {
-    if (ival == -1) {
-        timediff = 0;
-        total = time;
-        timer.innerHTML = (usedecimal ? total + '<small>.0</small>' : total);
-    }
-}
-
-function toggleDecimal() {
-    if (ival == -1) {
-        usedecimal = !usedecimal;
-        timer.innerHTML = (usedecimal ? total + '<small>.0</small>' : total);
-    }
-}
-
-function ceaseFire() {
-    if (timediff == 0) {
-        reset(false);
-        timediff = new Date().getTime() - start;
-        stopAllSounds(cease);
-        cease.play();
-    }
-}
-
-function pauseOrResumeTimer() {
-    if (ival === -1) {
-        startTimer();
-    } else {
-        ceaseFire();
-    }
-}
-
-function toggleInversedColors() {
-    inversedColors = document.getElementById('toggleColors').checked;
-    body = document.getElementsByTagName('body')[0];
-    if (inversedColors) {
-        body.style.backgroundColor = "red";
-        timer.style.color = "black";
-        document.getElementsByClassName('config')[0].getElementsByTagName('a')[0].style.color = "#AAA";
-        document.getElementsByClassName('egcy')[0].style.color = "#333";
-        
-    } else {
-        body.style.backgroundColor = "black";
-        timer.style.color = "red";
-        document.getElementsByClassName('config')[0].getElementsByTagName('a')[0].style.color = "";
-        document.getElementsByClassName('egcy')[0].style.color = "";
-    }
-    document.getElementsByClassName('egcy')[0].addEventListener('mouseover', function() {
-        if (inversedColors) {
-            this.style.cssText = "color: black !important";
-        }
-    });
-    document.getElementsByClassName('egcy')[0].addEventListener('mouseout', function() {
-        if (inversedColors) {
-            this.style.color = "#333";
-        }
-    });
-}
-
-window.addEventListener("load", () => {
-    console.log("loaded");
-    localizeAndContinue('frFR');
-    hideOverlay('audsyncwarn');
-    hideOverlay('overlay');
-    hideOverlay('github-fork');
-    toggleABCD2(3);
-    startSound = document.getElementById('start'); // Ajoutez cette ligne
+    render();
 });
+
+window.startTimer = startTimer;
+window.ceaseFire = ceaseFire;
+window.pauseOrResumeTimer = pauseOrResumeTimer;
+window.toggleABCD = toggleABCD;
+window.toggleABCD2 = toggleABCD2;
+window.setABCD = setABCD;
+window.setTime = setTime;
+window.setTime2 = setTime2;
+window.toggleDecimal = toggleDecimal;
+window.toggleControls = toggleControls;
+window.toggleInversedColors = toggleInversedColors;
+window.localizeAndContinue = localizeAndContinue;
+window.getI18NEntry = getI18NEntry;
+window.getI18NArray = getI18NArray;
+window.getLanguage = getLanguage;
+window.showCtrlPanel = showCtrlPanel;
+window.toggleHelpPanel = toggleHelpPanel;
+window.setLanguage = setLanguage;
+window.getUiSnapshot = getUiSnapshot;
+window.toggleFullscreen = toggleFullscreen;

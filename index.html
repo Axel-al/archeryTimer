@@ -1,26 +1,75 @@
 <!DOCTYPE html>
-<html manifest="manifest.appcache">
+<html>
     <head>
         <title>Archery timer</title>
         <meta charset="UTF-8">
-        <link rel="stylesheet" type="text/css" href="style.css?1">
+        <link rel="stylesheet" type="text/css" href="style.css?2">
         <link rel="icon" type="image/png" href="favicon.png">
-        <script type="text/javascript" src="i18n.js?5"></script>
-        <script type="text/javascript" src="main.js?3"></script>
+        <script type="text/javascript" src="i18n.js?6"></script>
+        <script type="text/javascript" src="main.js?4"></script>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     </head>
-    <body style="background-color: black;">
-        <!-- Ajout de la case à cocher -->
-        <div style="position: fixed; top: 10px; right: 10px;">
-            <label for="toggleColors">Inverser les couleurs</label>
-            <input type="checkbox" id="toggleColors" onclick="toggleInversedColors()">
+    <body class="theme-normal phase-prep">
+        <button id="fullscreenButton" type="button" aria-label="Plein écran" title="Plein écran">
+            <span class="fullscreen-icon icon-expand" aria-hidden="true">
+                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 7V5a2 2 0 0 1 2-2h2"></path>
+                    <path d="M17 3h2a2 2 0 0 1 2 2v2"></path>
+                    <path d="M21 17v2a2 2 0 0 1-2 2h-2"></path>
+                    <path d="M7 21H5a2 2 0 0 1-2-2v-2"></path>
+                    <rect width="10" height="8" x="7" y="8" rx="1"></rect>
+                </svg>
+            </span>
+            <span class="fullscreen-icon icon-minimize" aria-hidden="true">
+                <svg stroke="currentColor" fill="none" stroke-width="2" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M8 3v3a2 2 0 0 1-2 2H3"></path>
+                    <path d="M21 8h-3a2 2 0 0 1-2-2V3"></path>
+                    <path d="M3 16h3a2 2 0 0 1 2 2v3"></path>
+                    <path d="M16 21v-3a2 2 0 0 1 2-2h3"></path>
+                </svg>
+            </span>
+        </button>
+
+        <div id="themeToggle">
+            <label for="toggleColors" data-i18n="controls.invert_colors">Inverser les couleurs</label>
+            <input type="checkbox" id="toggleColors">
         </div>
+
+        <div id="volumeControl">
+            <label for="volumeSlider" data-i18n="controls.volume">Volume</label>
+            <input type="range" min="0" max="100" step="1" id="volumeSlider" value="100">
+            <span id="volumeValue">100%</span>
+        </div>
+
         <div class="timer" id="maintimer">
-            <table><tbody><tr><td class="abcd noselect" onclick="toggleABCD();"><div id="abcd" style="display: none;">A<br />B</div></td><td id="timer">120</td></tr></tbody></table>
+            <table>
+                <tbody>
+                    <tr>
+                        <td class="abcd noselect" onclick="toggleABCD();"><div id="abcd"><span class="abcd-hint">AB/CD</span></div></td>
+                        <td id="timer" class="phase-prep">120</td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
+
         <div class="config" id="osccontrols">
-            <a href="javascript:void(0);" onclick="startTimer();" data-i18n="176cd88e-ad14-4a8b-9633-c8257ad35d92"></a><br /><a href="javascript:void(0);" class="egcy" onclick="ceaseFire();" data-i18n="2e507705-99cb-4d92-8fa7-436e32b67083"></a>
+            <a id="startAction" href="javascript:void(0);" onclick="startTimer();" data-i18n="controls.primary.start">Démarrer</a>
+            <br />
+            <a id="stopAction" href="javascript:void(0);" class="egcy disabled" onclick="ceaseFire();" aria-disabled="true">
+                <svg class="stop-banner" viewBox="0 0 1200 220" role="img" aria-label="Pause d'urgence">
+                    <defs>
+                        <pattern id="stopHazardPattern" patternUnits="userSpaceOnUse" width="24" height="24" patternTransform="rotate(45)">
+                            <rect x="0" y="0" width="12" height="24" fill="#ff8a00"></rect>
+                            <rect x="12" y="0" width="12" height="24" fill="#000000"></rect>
+                        </pattern>
+                    </defs>
+                    <text x="50%" y="55%" text-anchor="middle" dominant-baseline="middle" class="stop-outline-hazard stop-label-layer">Pause d'urgence</text>
+                    <text x="50%" y="55%" text-anchor="middle" dominant-baseline="middle" class="stop-outline-black stop-label-layer">Pause d'urgence</text>
+                    <text x="50%" y="55%" text-anchor="middle" dominant-baseline="middle" class="stop-fill stop-label-layer">Pause d'urgence</text>
+                </svg>
+            </a>
         </div>
+
         <div class="hidden">
             <audio id="beep3" preload="auto">
                 <source src="3beep.ogg" type="audio/ogg">
@@ -46,44 +95,31 @@
                 <source src="cease.m4a" type="audio/mp4">
             </audio>
         </div>
-        <div class="overlay hidden" id="overlay">
-            <div class="inneroverlay">
-                <p class="stronghead" data-i18n="78e23400-3a88-4271-9310-e2af36837c8d"></p>
-                <p><span data-i18n="ec50e48a-2cfd-4b19-bdbc-161aef491f82" data-i18n-ab='<span class="abcd">AB</span>' data-i18n-cd='<span class="abcd">CD</span>'></span><br /><span data-i18n="17a7b876-4cae-4032-ad70-f1b0331afa8b"></span></p>
-                <p data-i18n="64141455-4ad9-4968-ae2a-2cdb1d6f893b" data-i18n-remainingtime='<span class="timerdemo">120</span>'></p>
-                <p data-i18n="b6f9447d-542f-497f-b006-0a09ef6743e0" data-i18n-startcontinue='<span class="startdemo">{%$176cd88e-ad14-4a8b-9633-c8257ad35d92}</span>'></p>
-                <p data-i18n="91eafab3-1e35-488d-a24e-f5c5c9cc96c7" data-i18n-emergencystop='<span class="egcydemo">{%$2e507705-99cb-4d92-8fa7-436e32b67083}</span>'></p>
-                <p data-i18n="b9c6b8b2-41c2-479d-87ee-50ebb1d1ee2f" data-i18n-controlpanel='<a href="javascript:void(0);" onclick="showCtrlPanel();">{%$101c2c75-00a7-44de-b922-4af7eeec0d24}</a>'></p>
-                <p class="introcontinue"><a href="javascript:void(0);" onclick="hideOverlay('overlay'); hideOverlay('github-fork');" data-i18n="f1f31ca2-56f0-4a86-a92a-2a1ab120058b"></a></p>
+
+        <button id="helpPanelButton" class="utility-button" type="button" onclick="toggleHelpPanel()" data-i18n="controls.help_language">Aide / langue</button>
+        <button id="complexPanelButton" class="utility-button" type="button" onclick="showCtrlPanel()" data-i18n="controls.options">Options</button>
+
+        <div id="helpPanel" class="hidden" aria-hidden="true">
+            <h2 data-i18n="help.title">Comment utiliser le timer</h2>
+            <p data-i18n="help.usage.abcd_order_line" data-i18n-ab='<span class="help-action-ab">AB</span>' data-i18n-cd='<span class="help-action-cd">CD</span>'></p>
+            <p data-i18n="help.usage.single_line_hint"></p>
+            <p data-i18n="help.usage.timer_limit_line" data-i18n-remainingtime='<span class="help-action-time">{%$help.tokens.remaining_time}</span>'></p>
+            <p data-i18n="help.usage.start_continue_line" data-i18n-start='<span class="help-action-start">{%$controls.primary.start}</span>' data-i18n-resume='<span class="help-action-start">{%$controls.primary.resume}</span>' data-i18n-finish='<span class="help-action-start">{%$controls.primary.finish_round}</span>'></p>
+            <p data-i18n="help.usage.emergency_stop_line" data-i18n-emergencystop='<span class="help-action-stop">{%$controls.emergency_stop}</span>'></p>
+            <p data-i18n="help.usage.control_panel_line" data-i18n-controlpanel='<span class="help-action-option">{%$help.usage.control_panel_label}</span>'></p>
+            <p class="help-language-label" data-i18n="help.language_label">Changer la langue :</p>
+            <div class="help-language-buttons">
+                <button type="button" class="lang-btn lang-fr" onclick="setLanguage('frFR')"><span>FR</span></button>
+                <button type="button" class="lang-btn lang-en" onclick="setLanguage('enUS')"><span>EN</span></button>
+                <button type="button" class="lang-btn lang-no" onclick="setLanguage('nbNO')"><span>NO</span></button>
             </div>
+            <button type="button" class="help-close" onclick="toggleHelpPanel(false)" data-i18n="controls.close">Fermer</button>
         </div>
-        <div class="overlay hidden" id="audsyncwarn">
-            <div class="inneroverlay">
-                <p class="stronghead" data-i18n="d3fff53a-9f70-40ea-ae6a-da502f71d8af"></p>
-                <p data-i18n="2397d0ed-76f1-4fce-9db5-842367645a43"></p>
-                <p data-i18n="d26303e6-24d7-40cb-a8c2-29dce048ecdb" data-i18n-getintouch='<a href="https://varden.info/contact.php" target="_blank">{%$5ef3857e-333b-4de0-9292-7ef432118520}</a>'></p>
-                <p class="introcontinue"><a href="javascript:void(0);" onclick="hideOverlay('audsyncwarn')" data-i18n="ac1cb77e-01fd-4432-a185-01053bd5b611"></a></p>
-            </div>
+
+        <div id="prepControl">
+            <label for="prepTime" class="prep-label" data-i18n="controls.preparation_seconds">Temps de préparation (s) :</label>
+            <input type="number" min="3" id="prepTime" placeholder="20">
+            <div id="prepFeedback" aria-live="polite"></div>
         </div>
-        <div class="overlay hidden" id="welcome" style="background: black;">
-            <div class="inneroverlay">
-                <p class="stronghead">Welcome to the archery timer!</p>
-                <p>This is a standard archery timer that can be used for free, even commercially. You can choose how long each round should last, switch between AB and CD, and generally do anything you'd normally do with an archery timer. Here's an example of how it looks:</p>
-                <img src="preview.png" alt="Screenshot" class="imgpreview" />
-                <p>Select your language to continue:<br /><a href="./offline/"><small>(or download the timer for offline use)</small></a></p>
-                <p><img src="flags/us.svg?" alt="US" class="imgflag" onclick="localizeAndContinue('enUS');" /> <img src="flags/no.svg?" alt="NO" class="imgflag" onclick="localizeAndContinue('nbNO');" /></p>
-            </div>
-        </div>
-        <button id="complexPanelButton" onclick="showCtrlPanel()">Options</button>
-        <input type="number" min="3" id="prepTime" placeholder="Temps de préparation (s)">
-        <a href="https://github.com/bilde2910/ArcheryTimer" class="hidden" id="github-fork"></a>
-        <script type="text/javascript">
-            timer = document.getElementById('timer');
-            abcd = document.getElementById('abcd');
-            beep1 = document.getElementById('beep1');
-            beep2 = document.getElementById('beep2');
-            beep3 = document.getElementById('beep3');
-            cease = document.getElementById('cease');
-        </script>
     </body>
 </html>
