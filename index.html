@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
     <head>
         <title>Archery timer</title>
@@ -6,6 +6,14 @@
         <link rel="stylesheet" type="text/css" href="/css/style.css">
         <link rel="icon" type="image/png" href="/assets/icons/favicon.png">
         <script type="text/javascript" src="/js/i18n.js"></script>
+        <script type="text/javascript" src="/js/core/namespace.js"></script>
+        <script type="text/javascript" src="/js/core/state.js"></script>
+        <script type="text/javascript" src="/js/core/i18n-runtime.js"></script>
+        <script type="text/javascript" src="/js/core/audio.js"></script>
+        <script type="text/javascript" src="/js/core/render.js"></script>
+        <script type="text/javascript" src="/js/core/timer.js"></script>
+        <script type="text/javascript" src="/js/core/popup.js"></script>
+        <script type="text/javascript" src="/js/ui/main-ui.js"></script>
         <script type="text/javascript" src="/js/main.js"></script>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     </head>
@@ -45,7 +53,7 @@
             <table>
                 <tbody>
                     <tr>
-                        <td class="abcd noselect" onclick="toggleABCD();"><div id="abcd"><span class="abcd-hint">AB/CD</span></div></td>
+                        <td id="abcdToggle" class="abcd noselect"><div id="abcd"><span class="abcd-hint">AB/CD</span></div></td>
                         <td id="timer" class="phase-prep">120</td>
                     </tr>
                 </tbody>
@@ -53,9 +61,9 @@
         </div>
 
         <div class="config" id="osccontrols">
-            <a id="startAction" href="javascript:void(0);" onclick="startTimer();" data-i18n="controls.primary.start">Démarrer</a>
+            <a id="startAction" href="#" data-i18n="controls.primary.start">Démarrer</a>
             <br />
-            <a id="stopAction" href="javascript:void(0);" class="disabled" onclick="ceaseFire();" aria-disabled="true">
+            <a id="stopAction" href="#" class="disabled" aria-disabled="true">
                 <svg class="stop-banner" viewBox="0 0 1200 220" role="img" aria-label="Pause d'urgence">
                     <defs>
                         <pattern id="stopHazardPattern" patternUnits="userSpaceOnUse" width="24" height="24" patternTransform="rotate(45)">
@@ -96,8 +104,8 @@
             </audio>
         </div>
 
-        <button id="helpPanelButton" class="utility-button" type="button" onclick="toggleHelpPanel()" data-i18n="controls.help_language">Aide / langue</button>
-        <button id="complexPanelButton" class="utility-button" type="button" onclick="showCtrlPanel()" data-i18n="controls.options">Options</button>
+        <button id="helpPanelButton" class="utility-button" type="button" data-i18n="controls.help_language">Aide / langue</button>
+        <button id="complexPanelButton" class="utility-button" type="button" data-i18n="controls.options">Options</button>
 
         <div id="helpPanel" class="hidden" aria-hidden="true">
             <h2 data-i18n="help.title">Comment utiliser le timer</h2>
@@ -109,11 +117,11 @@
             <p data-i18n="help.usage.control_panel_line" data-i18n-controlpanel='<span class="help-action-option">{%$help.usage.control_panel_label}</span>'></p>
             <p class="help-language-label" data-i18n="help.language_label">Changer la langue :</p>
             <div class="help-language-buttons">
-                <button type="button" class="lang-btn lang-fr" onclick="setLanguage('frFR')"><span>FR</span></button>
-                <button type="button" class="lang-btn lang-en" onclick="setLanguage('enUS')"><span>EN</span></button>
-                <button type="button" class="lang-btn lang-no" onclick="setLanguage('nbNO')"><span>NO</span></button>
+                <button type="button" class="lang-btn lang-fr" data-language="frFR"><span>FR</span></button>
+                <button type="button" class="lang-btn lang-en" data-language="enUS"><span>EN</span></button>
+                <button type="button" class="lang-btn lang-no" data-language="nbNO"><span>NO</span></button>
             </div>
-            <button type="button" class="help-close" onclick="toggleHelpPanel(false)" data-i18n="controls.close">Fermer</button>
+            <button id="helpCloseButton" type="button" class="help-close" data-i18n="controls.close">Fermer</button>
         </div>
 
         <div id="prepControl">
