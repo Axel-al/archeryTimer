@@ -1,123 +1,99 @@
-﻿(function(window) {
-    var app = window.ArcheryTimer;
-    var state = app.state;
-    var dom = app.dom;
-    var audio = app.core.audio;
-    var i18nRuntime = app.core.i18n;
-    var render = app.core.render;
-    var timer = app.core.timer;
-    var popup = app.core.popup;
-    var ui = app.ui.main || {};
+﻿import { state, dom, isRunning } from '/js/core/state.js';
+import { setVolumePercent } from '/js/core/audio.js';
+import { setLanguage } from '/js/core/i18n-runtime.js';
+import { render, toggleFullscreen, updatePrepTimeFromInput } from '/js/core/render.js';
+import { cycleABCDMode, startTimer, ceaseFire, setInversedColors } from '/js/core/timer.js';
+import { showCtrlPanel } from '/js/core/popup.js';
 
-    function isHelpPanelOpen() {
-        return !!(dom.helpPanel && !dom.helpPanel.classList.contains('hidden'));
+let initialized = false;
+
+export function isHelpPanelOpen() {
+    return !!dom.helpPanel && !dom.helpPanel.classList.contains('hidden');
+}
+
+export function toggleHelpPanel(forceOpen) {
+    if (!dom.helpPanel) {
+        return;
     }
 
-    function toggleHelpPanel(forceOpen) {
-        if (!dom.helpPanel) {
-            return;
-        }
+    const shouldOpen = typeof forceOpen === 'boolean'
+        ? forceOpen
+        : dom.helpPanel.classList.contains('hidden');
 
-        var shouldOpen = typeof forceOpen === 'boolean'
-            ? forceOpen
-            : dom.helpPanel.classList.contains('hidden');
+    dom.helpPanel.classList.toggle('hidden', !shouldOpen);
+    dom.helpPanel.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+}
 
-        dom.helpPanel.classList.toggle('hidden', !shouldOpen);
-        dom.helpPanel.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+function handlePrepTimeChange() {
+    const changed = updatePrepTimeFromInput(true);
+    if (changed || isRunning()) {
+        render();
+    }
+}
+
+function bindClick(element, handler) {
+    element?.addEventListener('click', event => {
+        event.preventDefault();
+        handler(event);
+    });
+}
+
+export function initMainUI() {
+    if (initialized) {
+        return;
     }
 
-    function handlePrepTimeChange() {
-        var changed = render.updatePrepTimeFromInput(true);
-        if (changed || state.isRunning()) {
-            render.render();
-        }
-    }
+    bindClick(dom.abcdToggle, () => {
+        cycleABCDMode();
+    });
 
-    function bindClick(element, handler) {
-        if (!element) {
-            return;
-        }
+    bindClick(dom.startAction, () => {
+        startTimer();
+    });
 
-        element.addEventListener('click', function(event) {
-            event.preventDefault();
-            handler(event);
-        });
-    }
+    bindClick(dom.stopAction, () => {
+        ceaseFire();
+    });
 
-    function init() {
-        if (ui.initialized) {
-            return;
-        }
+    bindClick(dom.helpButton, () => {
+        toggleHelpPanel();
+    });
 
-        bindClick(dom.abcdToggle, function() {
-            timer.cycleABCDMode();
-        });
+    bindClick(dom.optionsButton, () => {
+        showCtrlPanel();
+    });
 
-        bindClick(dom.startAction, function() {
-            timer.startTimer();
-        });
+    bindClick(dom.helpClose, () => {
+        toggleHelpPanel(false);
+    });
 
-        bindClick(dom.stopAction, function() {
-            timer.ceaseFire();
-        });
-
-        bindClick(dom.helpButton, function() {
-            toggleHelpPanel();
-        });
-
-        bindClick(dom.optionsButton, function() {
-            popup.showCtrlPanel();
-        });
-
-        bindClick(dom.helpClose, function() {
-            toggleHelpPanel(false);
-        });
-
-        if (dom.languageButtons && dom.languageButtons.length) {
-            for (var i = 0; i < dom.languageButtons.length; i++) {
-                dom.languageButtons[i].addEventListener('click', function(event) {
-                    var button = event.currentTarget;
-                    var language = button.getAttribute('data-language');
-                    if (!language) {
-                        return;
-                    }
-
-                    if (i18nRuntime.setLanguage(language)) {
-                        render.render();
-                    }
-                });
+    for (const button of dom.languageButtons ?? []) {
+        button.addEventListener('click', event => {
+            const language = event.currentTarget?.getAttribute('data-language');
+            if (!language) {
+                return;
             }
-        }
 
-        if (dom.toggleColors) {
-            dom.toggleColors.addEventListener('change', function() {
-                timer.setInversedColors(dom.toggleColors.checked);
-            });
-        }
-
-        if (dom.volumeSlider) {
-            dom.volumeSlider.addEventListener('input', function() {
-                audio.setVolumePercent(dom.volumeSlider.value, true);
-            });
-        }
-
-        if (dom.fullscreenButton) {
-            dom.fullscreenButton.addEventListener('click', function(event) {
-                event.preventDefault();
-                render.toggleFullscreen();
-            });
-        }
-
-        if (dom.prepTime) {
-            dom.prepTime.addEventListener('change', handlePrepTimeChange);
-        }
-
-        ui.initialized = true;
+            if (setLanguage(language)) {
+                render();
+            }
+        });
     }
 
-    ui.init = init;
-    ui.toggleHelpPanel = toggleHelpPanel;
-    ui.isHelpPanelOpen = isHelpPanelOpen;
+    dom.toggleColors?.addEventListener('change', () => {
+        setInversedColors(dom.toggleColors?.checked);
+    });
 
-    app.ui.main = ui;
-})(window);
+    dom.volumeSlider?.addEventListener('input', () => {
+        setVolumePercent(dom.volumeSlider?.value, true);
+    });
+
+    dom.fullscreenButton?.addEventListener('click', event => {
+        event.preventDefault();
+        toggleFullscreen();
+    });
+
+    dom.prepTime?.addEventListener('change', handlePrepTimeChange);
+
+    initialized = true;
+}

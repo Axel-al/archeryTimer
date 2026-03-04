@@ -1,121 +1,105 @@
-﻿(function(window) {
-    var app = window.ArcheryTimer;
-    var state = app.state;
-    var i18nRuntime = app.core.i18n || {};
+﻿import { catalog, defaultLanguage } from '/js/i18n.js';
+import { state } from '/js/core/state.js';
 
-    function getCatalog() {
-        return app.catalog || {};
-    }
+export function getCatalog() {
+    return catalog;
+}
 
-    function getFallbackCatalog() {
-        var catalog = getCatalog();
-        return catalog.frFR || {};
-    }
+export function getDefaultLanguage() {
+    return defaultLanguage;
+}
 
-    function getLanguageCatalog(lang) {
-        var catalog = getCatalog();
-        if (catalog[lang]) {
-            return catalog[lang];
-        }
-        return getFallbackCatalog();
-    }
+function getFallbackCatalog() {
+    return catalog.frFR ?? {};
+}
 
-    function getEntry(key, langOverride) {
-        var languageCatalog = getLanguageCatalog(langOverride || state.language);
-        var fallbackCatalog = getFallbackCatalog();
+export function getLanguageCatalog(lang) {
+    return catalog[lang] ?? getFallbackCatalog();
+}
 
-        if (Object.prototype.hasOwnProperty.call(languageCatalog, key)) {
-            return languageCatalog[key];
-        }
-        return fallbackCatalog[key];
-    }
+export function getEntry(key, langOverride) {
+    const languageCatalog = getLanguageCatalog(langOverride ?? state.language);
+    const fallbackCatalog = getFallbackCatalog();
 
-    function replacePlaceholders(str, node, languageCatalog, fallbackCatalog) {
-        var replaced = str;
-        var tags = replaced.match(/\{%\$?[\w.-]+\}/g);
+    return Object.prototype.hasOwnProperty.call(languageCatalog, key)
+        ? languageCatalog[key]
+        : fallbackCatalog[key];
+}
 
-        while (tags !== null) {
-            for (var i = 0; i < tags.length; i++) {
-                var naked = tags[i].slice(2, -1).toLowerCase();
-                var value = '';
+export function replacePlaceholders(str, node, languageCatalog, fallbackCatalog) {
+    let replaced = str;
+    let tags = replaced.match(/\{%\$?[\w.-]+\}/g);
 
-                if (naked.substr(0, 1) === '$') {
-                    var nestedKey = naked.substring(1);
-                    value = Object.prototype.hasOwnProperty.call(languageCatalog, nestedKey)
-                        ? languageCatalog[nestedKey]
-                        : fallbackCatalog[nestedKey];
-                } else if (node) {
-                    value = node.getAttribute('data-i18n-' + naked);
-                }
+    while (tags !== null) {
+        for (const tag of tags) {
+            const naked = tag.slice(2, -1).toLowerCase();
+            let value = '';
 
-                if (typeof value !== 'string') {
-                    value = '';
-                }
-
-                replaced = replaced.replace(tags[i], value);
+            if (naked.startsWith('$')) {
+                const nestedKey = naked.substring(1);
+                value = Object.prototype.hasOwnProperty.call(languageCatalog, nestedKey)
+                    ? languageCatalog[nestedKey]
+                    : fallbackCatalog[nestedKey];
+            } else if (node) {
+                value = node.getAttribute(`data-i18n-${naked}`);
             }
 
-            tags = replaced.match(/\{%\$?[\w.-]+\}/g);
-        }
-
-        return replaced;
-    }
-
-    function localizeDocument(root, languageOverride) {
-        var target = root || document;
-        var lang = languageOverride || state.language;
-        var languageCatalog = getLanguageCatalog(lang);
-        var fallbackCatalog = getFallbackCatalog();
-        var elements = target.querySelectorAll('[data-i18n]');
-
-        for (var i = 0; i < elements.length; i++) {
-            var key = elements[i].dataset.i18n;
-            var str = Object.prototype.hasOwnProperty.call(languageCatalog, key)
-                ? languageCatalog[key]
-                : fallbackCatalog[key];
-
-            if (Array.isArray(str)) {
-                str = str[0];
-            }
-            if (typeof str !== 'string') {
-                continue;
+            if (typeof value !== 'string') {
+                value = '';
             }
 
-            elements[i].innerHTML = replacePlaceholders(str, elements[i], languageCatalog, fallbackCatalog);
+            replaced = replaced.replace(tag, value);
+        }
+
+        tags = replaced.match(/\{%\$?[\w.-]+\}/g);
+    }
+
+    return replaced;
+}
+
+export function localizeDocument(root = document, languageOverride) {
+    const lang = languageOverride ?? state.language;
+    const languageCatalog = getLanguageCatalog(lang);
+    const fallbackCatalog = getFallbackCatalog();
+    const elements = root.querySelectorAll('[data-i18n]');
+
+    for (const element of elements) {
+        const key = element.dataset.i18n;
+        let str = Object.prototype.hasOwnProperty.call(languageCatalog, key)
+            ? languageCatalog[key]
+            : fallbackCatalog[key];
+
+        if (Array.isArray(str)) {
+            [str] = str;
+        }
+
+        if (typeof str !== 'string') {
+            continue;
+        }
+
+        element.innerHTML = replacePlaceholders(str, element, languageCatalog, fallbackCatalog);
+    }
+}
+
+export function setLanguage(lang, persist = true) {
+    if (!catalog[lang]) {
+        return false;
+    }
+
+    state.language = lang;
+    localizeDocument(document, state.language);
+
+    if (persist) {
+        try {
+            localStorage.setItem('archeryTimer.language', state.language);
+        } catch {
+            // Ignore storage failures.
         }
     }
 
-    function setLanguage(lang, persist) {
-        var catalog = getCatalog();
-        if (!catalog[lang]) {
-            return false;
-        }
+    return true;
+}
 
-        state.language = lang;
-        localizeDocument(document, state.language);
-
-        if (persist !== false) {
-            try {
-                localStorage.setItem('archeryTimer.language', state.language);
-            } catch (error) {
-                // Ignore storage failures.
-            }
-        }
-
-        return true;
-    }
-
-    function getLanguage() {
-        return state.language;
-    }
-
-    i18nRuntime.getEntry = getEntry;
-    i18nRuntime.replacePlaceholders = replacePlaceholders;
-    i18nRuntime.localizeDocument = localizeDocument;
-    i18nRuntime.setLanguage = setLanguage;
-    i18nRuntime.getLanguage = getLanguage;
-    i18nRuntime.getCatalog = getCatalog;
-    i18nRuntime.getLanguageCatalog = getLanguageCatalog;
-
-    app.core.i18n = i18nRuntime;
-})(window);
+export function getLanguage() {
+    return state.language;
+}

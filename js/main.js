@@ -1,89 +1,94 @@
-﻿(function(window) {
-    var app = window.ArcheryTimer;
-    var state = app.state;
-    var dom = app.dom;
-    var i18nRuntime = app.core.i18n;
-    var audio = app.core.audio;
-    var render = app.core.render;
-    var timer = app.core.timer;
-    var popup = app.core.popup;
-    var mainUi = app.ui.main;
+﻿import { state, dom, readMainDom, safeInt } from '/js/core/state.js';
+import { getCatalog, getDefaultLanguage, setLanguage } from '/js/core/i18n-runtime.js';
+import { setVolumePercent } from '/js/core/audio.js';
+import { updatePrepTimeFromInput, setControlsHidden, render } from '/js/core/render.js';
+import { pauseOrResumeTimer } from '/js/core/timer.js';
+import { closeCtrlPanel, createBridge } from '/js/core/popup.js';
+import { initMainUI, isHelpPanelOpen, toggleHelpPanel } from '/js/ui/main-ui.js';
 
-    function canHandleSpacebar(event) {
-        var target = event.target;
-        if (!target) {
-            return true;
-        }
+const bridge = createBridge();
+window.ArcheryTimerBridge = bridge;
 
-        var tag = target.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON') {
-            return false;
-        }
-
-        return !target.isContentEditable;
+function canHandleSpacebar(event) {
+    const target = event.target;
+    if (!target) {
+        return true;
     }
 
-    function initializePreferences() {
-        try {
-            var catalog = app.catalog || {};
-            var storedLang = localStorage.getItem('archeryTimer.language');
+    const tag = target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON') {
+        return false;
+    }
 
-            if (storedLang && catalog[storedLang]) {
-                state.language = storedLang;
-            } else {
-                var browserLang = (navigator.language || 'fr').slice(0, 2).toLowerCase();
-                if (app.defaultLanguage && Object.prototype.hasOwnProperty.call(app.defaultLanguage, browserLang)) {
-                    state.language = app.defaultLanguage[browserLang];
-                }
+    return !target.isContentEditable;
+}
+
+function initializePreferences() {
+    try {
+        const catalog = getCatalog();
+        const defaultLanguage = getDefaultLanguage();
+        const storedLang = localStorage.getItem('archeryTimer.language');
+
+        if (storedLang && catalog[storedLang]) {
+            state.language = storedLang;
+        } else {
+            const browserLang = (navigator.language ?? 'fr').slice(0, 2).toLowerCase();
+            if (Object.prototype.hasOwnProperty.call(defaultLanguage, browserLang)) {
+                state.language = defaultLanguage[browserLang];
             }
-
-            state.inversedColors = localStorage.getItem('archeryTimer.themeInversed') === '1';
-            var storedVolume = state.safeInt(localStorage.getItem('archeryTimer.volume'), state.volumePercent);
-            state.volumePercent = Math.max(0, Math.min(100, storedVolume));
-        } catch (error) {
-            // Ignore storage failures.
         }
+
+        state.inversedColors = localStorage.getItem('archeryTimer.themeInversed') === '1';
+        const storedVolume = safeInt(localStorage.getItem('archeryTimer.volume'), state.volumePercent);
+        state.volumePercent = Math.max(0, Math.min(100, storedVolume));
+    } catch {
+        // Ignore storage failures.
+    }
+}
+
+function bootstrap() {
+    readMainDom(document);
+    initMainUI();
+
+    if (dom.prepTime && !dom.prepTime.value) {
+        dom.prepTime.value = String(state.prepSeconds);
     }
 
-    function bootstrap() {
-        state.readMainDom(document);
-        mainUi.init();
+    updatePrepTimeFromInput(false);
+    initializePreferences();
+    setVolumePercent(state.volumePercent, false);
+    setControlsHidden(state.controlsHidden);
+    setLanguage(state.language, false);
+    render();
+}
 
-        if (dom.prepTime && !dom.prepTime.value) {
-            dom.prepTime.value = String(state.prepSeconds);
-        }
-
-        render.updatePrepTimeFromInput(false);
-        initializePreferences();
-        audio.setVolumePercent(state.volumePercent, false);
-        render.setControlsHidden(state.controlsHidden);
-        i18nRuntime.setLanguage(state.language, false);
-        render.render();
+document.addEventListener('keydown', event => {
+    if (event.code === 'Space' && canHandleSpacebar(event)) {
+        event.preventDefault();
+        pauseOrResumeTimer();
+        return;
     }
 
-    document.addEventListener('keydown', function(event) {
-        if (event.code === 'Space' && canHandleSpacebar(event)) {
-            event.preventDefault();
-            timer.pauseOrResumeTimer();
-            return;
-        }
+    if (event.code === 'Escape' && isHelpPanelOpen()) {
+        toggleHelpPanel(false);
+    }
+});
 
-        if (event.code === 'Escape' && mainUi.isHelpPanelOpen()) {
-            mainUi.toggleHelpPanel(false);
-        }
-    });
+window.addEventListener('beforeunload', () => {
+    closeCtrlPanel();
+});
 
-    window.addEventListener('beforeunload', function() {
-        popup.closeCtrlPanel();
-    });
+window.addEventListener('unload', () => {
+    closeCtrlPanel();
+    try {
+        delete window.ArcheryTimerBridge;
+    } catch {
+        window.ArcheryTimerBridge = undefined;
+    }
+});
 
-    window.addEventListener('unload', function() {
-        popup.closeCtrlPanel();
-    });
+window.addEventListener('fullscreenchange', () => {
+    render();
+});
 
-    window.addEventListener('fullscreenchange', function() {
-        render.render();
-    });
-
-    window.addEventListener('load', bootstrap);
-})(window);
+window.addEventListener('load', bootstrap);

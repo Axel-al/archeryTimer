@@ -1,99 +1,101 @@
-﻿(function(window) {
-    var app = window.ArcheryTimer;
-    var state = app.state;
-    var render = app.core.render;
-    var timer = app.core.timer;
-    var i18nRuntime = app.core.i18n;
-    var popup = app.core.popup || {};
-    var bridge = app.bridge || {};
+﻿import { state } from '/js/core/state.js';
+import { render, setControlsHidden, getSnapshot } from '/js/core/render.js';
+import {
+    startTimer as runPrimaryAction,
+    ceaseFire as emergencyCeaseFire,
+    setRoundSeconds as applyRoundSeconds,
+    setABCDMode as applyABCDMode,
+    toggleDecimal as toggleDecimalDisplay,
+    toggleControls as toggleMainControls
+} from '/js/core/timer.js';
+import { getCatalog, getLanguage } from '/js/core/i18n-runtime.js';
 
-    function restoreCtrlPanelState(monitoredWindow) {
-        if (state.ctrlPanelWindow === monitoredWindow) {
-            state.ctrlPanelWindow = null;
-        }
-
-        if (state.ctrlPanelAutoHidden) {
-            render.setControlsHidden(false);
-            state.ctrlPanelAutoHidden = false;
-            render.render();
-        }
+function restoreCtrlPanelState(monitoredWindow) {
+    // Ignore stale close callbacks from a previous popup instance.
+    if (state.ctrlPanelWindow !== monitoredWindow) {
+        return;
     }
 
-    function closeCtrlPanel() {
-        if (state.ctrlPanelWindow && !state.ctrlPanelWindow.closed) {
-            state.ctrlPanelWindow.close();
-        }
-        restoreCtrlPanelState(state.ctrlPanelWindow);
+    state.ctrlPanelWindow = null;
+
+    if (state.ctrlPanelAutoHidden) {
+        setControlsHidden(false);
+        state.ctrlPanelAutoHidden = false;
+        render();
+    }
+}
+
+export function closeCtrlPanel() {
+    if (state.ctrlPanelWindow && !state.ctrlPanelWindow.closed) {
+        state.ctrlPanelWindow.close();
     }
 
-    function showCtrlPanel() {
-        if (state.ctrlPanelWindow && !state.ctrlPanelWindow.closed) {
-            state.ctrlPanelWindow.focus();
-            return state.ctrlPanelWindow;
-        }
+    restoreCtrlPanelState(state.ctrlPanelWindow);
+}
 
-        var opened = window.open('/panels/ctrlpanel.html', '_blank', 'height=280,width=650');
-        if (!opened) {
-            return null;
-        }
-
-        state.ctrlPanelWindow = opened;
-
-        if (!state.controlsHidden) {
-            state.ctrlPanelAutoHidden = true;
-            render.setControlsHidden(true);
-            render.render();
-        }
-
-        if (opened.addEventListener) {
-            opened.addEventListener('blur', function() {
-                if (!opened.closed) {
-                    opened.close();
-                }
-            });
-        }
-
-        var checkClosed = window.setInterval(function() {
-            if (!opened || opened.closed) {
-                window.clearInterval(checkClosed);
-                restoreCtrlPanelState(opened);
-            }
-        }, 250);
-
-        return opened;
+export function showCtrlPanel() {
+    if (state.ctrlPanelWindow && !state.ctrlPanelWindow.closed) {
+        state.ctrlPanelWindow.focus();
+        return state.ctrlPanelWindow;
     }
 
-    bridge.runPrimaryAction = function() {
-        timer.startTimer();
-    };
-    bridge.ceaseFire = function() {
-        timer.ceaseFire();
-    };
-    bridge.setRoundSeconds = function(seconds) {
-        timer.setRoundSeconds(seconds);
-    };
-    bridge.setABCDMode = function(mode) {
-        timer.setABCDMode(mode);
-    };
-    bridge.toggleDecimal = function() {
-        timer.toggleDecimal();
-    };
-    bridge.toggleControls = function() {
-        timer.toggleControls();
-    };
-    bridge.getSnapshot = function() {
-        return render.getSnapshot();
-    };
-    bridge.getCatalog = function() {
-        return i18nRuntime.getCatalog();
-    };
-    bridge.getLanguage = function() {
-        return i18nRuntime.getLanguage();
-    };
+    const opened = window.open('/panels/ctrlpanel.html', '_blank', 'height=280,width=650');
+    if (!opened) {
+        return null;
+    }
 
-    popup.closeCtrlPanel = closeCtrlPanel;
-    popup.showCtrlPanel = showCtrlPanel;
+    state.ctrlPanelWindow = opened;
 
-    app.core.popup = popup;
-    app.bridge = bridge;
-})(window);
+    if (!state.controlsHidden) {
+        state.ctrlPanelAutoHidden = true;
+        setControlsHidden(true);
+        render();
+    }
+
+    opened.addEventListener?.('blur', () => {
+        if (!opened.closed) {
+            opened.close();
+        }
+    });
+
+    const checkClosed = window.setInterval(() => {
+        if (!opened || opened.closed) {
+            window.clearInterval(checkClosed);
+            restoreCtrlPanelState(opened);
+        }
+    }, 250);
+
+    return opened;
+}
+
+export function createBridge() {
+    return {
+        runPrimaryAction() {
+            runPrimaryAction();
+        },
+        ceaseFire() {
+            emergencyCeaseFire();
+        },
+        setRoundSeconds(seconds) {
+            applyRoundSeconds(seconds);
+        },
+        setABCDMode(mode) {
+            applyABCDMode(mode);
+        },
+        toggleDecimal() {
+            toggleDecimalDisplay();
+        },
+        toggleControls() {
+            toggleMainControls();
+        },
+        getSnapshot() {
+            return getSnapshot();
+        },
+        getCatalog() {
+            return getCatalog();
+        },
+        getLanguage() {
+            return getLanguage();
+        }
+    };
+}

@@ -1,72 +1,61 @@
-﻿(function(window) {
-    var app = window.ArcheryTimer;
-    var state = app.state;
-    var dom = app.dom;
-    var audio = app.core.audio || {};
+﻿import { state, dom, safeInt } from '/js/core/state.js';
 
-    function stop(sound) {
-        if (!sound) {
-            return;
-        }
-        sound.pause();
-        sound.currentTime = 0;
+function sounds() {
+    return [dom.beep1, dom.beep2, dom.beep3, dom.cease, dom.startSound];
+}
+
+export function stop(sound) {
+    if (!sound) {
+        return;
     }
 
-    function stopAll(exceptSound) {
-        var sounds = [dom.beep1, dom.beep2, dom.beep3, dom.cease, dom.startSound];
+    sound.pause();
+    sound.currentTime = 0;
+}
 
-        for (var i = 0; i < sounds.length; i++) {
-            if (sounds[i] && sounds[i] !== exceptSound && !sounds[i].paused) {
-                stop(sounds[i]);
-            }
+export function stopAll(exceptSound) {
+    for (const sound of sounds()) {
+        if (sound && sound !== exceptSound && !sound.paused) {
+            stop(sound);
         }
     }
+}
 
-    function play(sound) {
-        if (!sound) {
-            return;
-        }
-
-        stopAll(sound);
-        sound.play();
+export function play(sound) {
+    if (!sound) {
+        return;
     }
 
-    function applyVolume() {
-        var level = Math.max(0, Math.min(100, state.volumePercent)) / 100;
-        var sounds = [dom.beep1, dom.beep2, dom.beep3, dom.cease, dom.startSound];
+    stopAll(sound);
+    sound.play();
+}
 
-        for (var i = 0; i < sounds.length; i++) {
-            if (sounds[i]) {
-                sounds[i].volume = level;
-            }
+export function applyVolume() {
+    const level = Math.max(0, Math.min(100, state.volumePercent)) / 100;
+
+    for (const sound of sounds()) {
+        if (sound) {
+            sound.volume = level;
         }
     }
+}
 
-    function setVolumePercent(value, persist) {
-        state.volumePercent = Math.max(0, Math.min(100, state.safeInt(value, state.volumePercent)));
-        applyVolume();
+export function setVolumePercent(value, persist) {
+    state.volumePercent = Math.max(0, Math.min(100, safeInt(value, state.volumePercent)));
+    applyVolume();
 
-        if (dom.volumeSlider) {
-            dom.volumeSlider.value = String(state.volumePercent);
-        }
-        if (dom.volumeValue) {
-            dom.volumeValue.textContent = state.volumePercent + '%';
-        }
-
-        if (persist) {
-            try {
-                localStorage.setItem('archeryTimer.volume', String(state.volumePercent));
-            } catch (error) {
-                // Ignore storage failures.
-            }
-        }
+    if (dom.volumeSlider) {
+        dom.volumeSlider.value = String(state.volumePercent);
+    }
+    if (dom.volumeValue) {
+        dom.volumeValue.textContent = `${state.volumePercent}%`;
     }
 
-    audio.stop = stop;
-    audio.stopAll = stopAll;
-    audio.play = play;
-    audio.applyVolume = applyVolume;
-    audio.setVolumePercent = setVolumePercent;
-
-    app.core.audio = audio;
-})(window);
+    if (persist) {
+        try {
+            localStorage.setItem('archeryTimer.volume', String(state.volumePercent));
+        } catch {
+            // Ignore storage failures.
+        }
+    }
+}

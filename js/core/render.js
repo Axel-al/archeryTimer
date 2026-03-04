@@ -1,255 +1,236 @@
-﻿(function(window) {
-    var app = window.ArcheryTimer;
-    var state = app.state;
-    var dom = app.dom;
-    var i18nRuntime = app.core.i18n;
-    var render = app.core.render || {};
+﻿import {
+    PHASE_CLASS_MAP,
+    state,
+    dom,
+    clampPrepSeconds,
+    isRunning,
+    isPaused,
+    getElapsedMs,
+    getNowMs,
+    getPhaseState,
+    getPhaseTone,
+    getABCDLabel,
+    getABCDMode
+} from '/js/core/state.js';
+import { getEntry } from '/js/core/i18n-runtime.js';
 
-    function showPrepFeedback(message, isError) {
-        if (!dom.prepFeedback) {
-            return;
-        }
-
-        dom.prepFeedback.textContent = message;
-        dom.prepFeedback.classList.remove('prep-feedback-visible', 'prep-feedback-error');
-
-        if (isError) {
-            dom.prepFeedback.classList.add('prep-feedback-error');
-        }
-
-        void dom.prepFeedback.offsetWidth;
-        dom.prepFeedback.classList.add('prep-feedback-visible');
-
-        window.clearTimeout(state.prepFeedbackTimeout);
-        state.prepFeedbackTimeout = window.setTimeout(function() {
-            dom.prepFeedback.classList.remove('prep-feedback-visible');
-        }, 1800);
+export function showPrepFeedback(message, isError) {
+    if (!dom.prepFeedback) {
+        return;
     }
 
-    function updatePrepTimeFromInput(showFeedback) {
-        if (!dom.prepTime) {
-            return false;
-        }
+    dom.prepFeedback.textContent = message;
+    dom.prepFeedback.classList.remove('prep-feedback-visible', 'prep-feedback-error');
 
-        var raw = String(dom.prepTime.value || '').trim();
-        if (raw === '') {
-            raw = '20';
-        }
+    if (isError) {
+        dom.prepFeedback.classList.add('prep-feedback-error');
+    }
 
-        var parsed = parseInt(raw, 10);
-        if (!Number.isFinite(parsed)) {
-            showPrepFeedback(i18nRuntime.getEntry('feedback.prep_invalid') || 'Valeur invalide: minimum 3 secondes.', true);
-            dom.prepTime.value = String(state.prepSeconds);
-            return false;
-        }
+    void dom.prepFeedback.offsetWidth;
+    dom.prepFeedback.classList.add('prep-feedback-visible');
 
-        var next = state.clampPrepSeconds(parsed);
-        var changed = next !== state.prepSeconds;
-        state.prepSeconds = next;
+    window.clearTimeout(state.prepFeedbackTimeout);
+    state.prepFeedbackTimeout = window.setTimeout(() => {
+        dom.prepFeedback?.classList.remove('prep-feedback-visible');
+    }, 1800);
+}
+
+export function updatePrepTimeFromInput(showFeedback) {
+    if (!dom.prepTime) {
+        return false;
+    }
+
+    let raw = String(dom.prepTime.value ?? '').trim();
+    if (raw === '') {
+        raw = '20';
+    }
+
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) {
+        showPrepFeedback(getEntry('feedback.prep_invalid') ?? 'Valeur invalide: minimum 3 secondes.', true);
         dom.prepTime.value = String(state.prepSeconds);
-
-        if (showFeedback) {
-            var template = i18nRuntime.getEntry('feedback.prep_applied') || 'Préparation: {value}s (appliqué)';
-            showPrepFeedback(template.replace('{value}', state.prepSeconds), false);
-        }
-
-        return changed;
+        return false;
     }
 
-    function setControlsHidden(hidden) {
-        state.controlsHidden = !!hidden;
+    const next = clampPrepSeconds(parsed);
+    const changed = next !== state.prepSeconds;
+    state.prepSeconds = next;
+    dom.prepTime.value = String(state.prepSeconds);
 
-        if (!dom.body) {
-            return;
-        }
-
-        dom.body.classList.toggle('controls-hidden', state.controlsHidden);
+    if (showFeedback) {
+        const template = getEntry('feedback.prep_applied') ?? 'Préparation: {value}s (appliqué)';
+        showPrepFeedback(template.replace('{value}', state.prepSeconds), false);
     }
 
-    function formatTimerValue(ms) {
-        if (state.useDecimal) {
-            var tenths = Math.max(0, Math.floor(ms / 100));
-            var whole = Math.floor(tenths / 10);
-            var decimal = tenths % 10;
-            return whole + '<small>.' + decimal + '</small>';
-        }
+    return changed;
+}
 
-        return String(Math.max(0, Math.ceil(ms / 1000)));
+export function setControlsHidden(hidden) {
+    state.controlsHidden = !!hidden;
+    dom.body?.classList.toggle('controls-hidden', state.controlsHidden);
+}
+
+function formatTimerValue(ms) {
+    if (state.useDecimal) {
+        const tenths = Math.max(0, Math.floor(ms / 100));
+        const whole = Math.floor(tenths / 10);
+        const decimal = tenths % 10;
+        return `${whole}<small>.${decimal}</small>`;
     }
 
-    function applyPhaseClass(element, phaseTone) {
-        if (!element) {
-            return;
-        }
+    return String(Math.max(0, Math.ceil(ms / 1000)));
+}
 
-        element.classList.remove(state.PHASE_CLASS_MAP.prep, state.PHASE_CLASS_MAP.shoot, state.PHASE_CLASS_MAP.low);
-        element.classList.add(state.PHASE_CLASS_MAP[phaseTone] || state.PHASE_CLASS_MAP.prep);
+function applyPhaseClass(element, phaseTone) {
+    if (!element) {
+        return;
     }
 
-    function renderTheme(phaseTone) {
-        if (!dom.body || !dom.timer) {
-            return;
-        }
+    element.classList.remove(PHASE_CLASS_MAP.prep, PHASE_CLASS_MAP.shoot, PHASE_CLASS_MAP.low);
+    element.classList.add(PHASE_CLASS_MAP[phaseTone] ?? PHASE_CLASS_MAP.prep);
+}
 
-        dom.body.classList.toggle('theme-inversed', state.inversedColors);
-        dom.body.classList.toggle('theme-normal', !state.inversedColors);
-
-        applyPhaseClass(dom.body, phaseTone);
-        applyPhaseClass(dom.timer, phaseTone);
+export function renderTheme(phaseTone) {
+    if (!dom.body || !dom.timer) {
+        return;
     }
 
-    function isFullscreenActive() {
-        return !!document.fullscreenElement;
+    dom.body.classList.toggle('theme-inversed', state.inversedColors);
+    dom.body.classList.toggle('theme-normal', !state.inversedColors);
+
+    applyPhaseClass(dom.body, phaseTone);
+    applyPhaseClass(dom.timer, phaseTone);
+}
+
+export function isFullscreenActive() {
+    return !!document.fullscreenElement;
+}
+
+export function toggleFullscreen() {
+    const root = document.documentElement;
+
+    if (!isFullscreenActive()) {
+        root.requestFullscreen?.();
+        return;
     }
 
-    function toggleFullscreen() {
-        var root = document.documentElement;
+    document.exitFullscreen?.();
+}
 
-        if (!isFullscreenActive()) {
-            if (root.requestFullscreen) {
-                root.requestFullscreen();
-            }
-            return;
-        }
-
-        if (document.exitFullscreen) {
-            document.exitFullscreen();
-        }
+function setEmergencyStopLabel(label) {
+    if (!dom.stopAction) {
+        return;
     }
 
-    function setEmergencyStopLabel(label) {
-        if (!dom.stopAction) {
-            return;
-        }
-
-        var labels = dom.stopAction.querySelectorAll('.stop-label-layer');
-        for (var i = 0; i < labels.length; i++) {
-            labels[i].textContent = label;
-        }
-
-        dom.stopAction.setAttribute('aria-label', label);
-        var banner = dom.stopAction.querySelector('.stop-banner');
-        if (banner) {
-            banner.setAttribute('aria-label', label);
-        }
+    const labels = dom.stopAction.querySelectorAll('.stop-label-layer');
+    for (const item of labels) {
+        item.textContent = label;
     }
 
-    function getPrimaryActionState() {
-        if (state.isRunning()) {
-            return 'finish_round';
-        }
-        if (state.isPaused()) {
-            return 'resume';
-        }
-        return 'start';
+    dom.stopAction.setAttribute('aria-label', label);
+    dom.stopAction.querySelector('.stop-banner')?.setAttribute('aria-label', label);
+}
+
+export function getPrimaryActionState() {
+    if (isRunning()) {
+        return 'finish_round';
+    }
+    if (isPaused()) {
+        return 'resume';
+    }
+    return 'start';
+}
+
+export function getPrimaryActionLabel() {
+    const actionState = getPrimaryActionState();
+
+    if (actionState === 'resume') {
+        return getEntry('controls.primary.resume') ?? 'Reprendre';
+    }
+    if (actionState === 'finish_round') {
+        return getEntry('controls.primary.finish_round') ?? 'Finir la volée';
+    }
+    return getEntry('controls.primary.start') ?? 'Démarrer';
+}
+
+function renderActions() {
+    if (dom.startAction) {
+        dom.startAction.innerHTML = getPrimaryActionLabel();
+        dom.startAction.dataset.actionState = getPrimaryActionState();
     }
 
-    function getPrimaryActionLabel() {
-        var actionState = getPrimaryActionState();
-
-        if (actionState === 'resume') {
-            return i18nRuntime.getEntry('controls.primary.resume') || 'Reprendre';
-        }
-        if (actionState === 'finish_round') {
-            return i18nRuntime.getEntry('controls.primary.finish_round') || 'Finir la volée';
-        }
-        return i18nRuntime.getEntry('controls.primary.start') || 'Démarrer';
+    if (dom.stopAction) {
+        const enabled = isRunning();
+        setEmergencyStopLabel(getEntry('controls.emergency_stop') ?? "Pause d'urgence");
+        dom.stopAction.classList.toggle('disabled', !enabled);
+        dom.stopAction.setAttribute('aria-disabled', enabled ? 'false' : 'true');
     }
 
-    function renderActions() {
-        if (dom.startAction) {
-            dom.startAction.innerHTML = getPrimaryActionLabel();
-            dom.startAction.dataset.actionState = getPrimaryActionState();
-        }
+    if (dom.fullscreenButton) {
+        const fullscreenLabel = isFullscreenActive()
+            ? (getEntry('controls.exit_fullscreen') ?? 'Quitter le plein écran')
+            : (getEntry('controls.fullscreen') ?? 'Plein écran');
 
-        if (dom.stopAction) {
-            var enabled = state.isRunning();
-            setEmergencyStopLabel(i18nRuntime.getEntry('controls.emergency_stop') || "Pause d'urgence");
-            dom.stopAction.classList.toggle('disabled', !enabled);
-            dom.stopAction.setAttribute('aria-disabled', enabled ? 'false' : 'true');
-        }
+        dom.fullscreenButton.title = fullscreenLabel;
+        dom.fullscreenButton.setAttribute('aria-label', fullscreenLabel);
+        dom.fullscreenButton.classList.toggle('is-active', isFullscreenActive());
+    }
+}
 
-        if (dom.fullscreenButton) {
-            var fullscreenLabel = isFullscreenActive()
-                ? (i18nRuntime.getEntry('controls.exit_fullscreen') || 'Quitter le plein écran')
-                : (i18nRuntime.getEntry('controls.fullscreen') || 'Plein écran');
-
-            dom.fullscreenButton.title = fullscreenLabel;
-            dom.fullscreenButton.setAttribute('aria-label', fullscreenLabel);
-            dom.fullscreenButton.classList.toggle('is-active', isFullscreenActive());
-        }
+function renderABCD() {
+    if (!dom.abcd) {
+        return;
     }
 
-    function renderABCD() {
-        if (!dom.abcd) {
-            return;
-        }
-
-        if (!state.useABCD) {
-            dom.abcd.innerHTML = '<span class="abcd-hint">' + (i18nRuntime.getEntry('hints.abcd_click') || 'AB/CD') + '</span>';
-            return;
-        }
-
-        dom.abcd.innerHTML = state.getABCDLabel();
+    if (!state.useABCD) {
+        dom.abcd.innerHTML = `<span class="abcd-hint">${getEntry('hints.abcd_click') ?? 'AB/CD'}</span>`;
+        return;
     }
 
-    function renderTimer() {
-        if (!dom.timer) {
-            return;
-        }
+    dom.abcd.innerHTML = getABCDLabel();
+}
 
-        if (!state.isRunning() && state.pausedElapsedMs === 0) {
-            dom.timer.innerHTML = state.useDecimal
-                ? state.totalSeconds + '<small>.0</small>'
-                : String(state.totalSeconds);
-            renderTheme('prep');
-            return;
-        }
-
-        var elapsedMs = state.getElapsedMs(state.getNowMs());
-        var phaseState = state.getPhaseState(elapsedMs);
-        dom.timer.innerHTML = formatTimerValue(phaseState.phaseRemainingMs);
-        renderTheme(state.getPhaseTone(phaseState));
+function renderTimer() {
+    if (!dom.timer) {
+        return;
     }
 
-    function renderAll() {
-        if (!dom.body || !dom.timer) {
-            return;
-        }
-
-        if (dom.toggleColors) {
-            dom.toggleColors.checked = state.inversedColors;
-        }
-
-        renderTimer();
-        renderABCD();
-        renderActions();
+    if (!isRunning() && state.pausedElapsedMs === 0) {
+        dom.timer.innerHTML = state.useDecimal ? `${state.totalSeconds}<small>.0</small>` : String(state.totalSeconds);
+        renderTheme('prep');
+        return;
     }
 
-    function getSnapshot() {
-        return {
-            primaryActionState: getPrimaryActionState(),
-            primaryActionLabel: getPrimaryActionLabel(),
-            emergencyEnabled: state.isRunning(),
-            inversedColors: state.inversedColors,
-            language: state.language,
-            controlsHidden: state.controlsHidden,
-            roundSeconds: state.totalSeconds,
-            prepSeconds: state.prepSeconds,
-            abcdMode: state.getABCDMode()
-        };
+    const elapsedMs = getElapsedMs(getNowMs());
+    const phaseState = getPhaseState(elapsedMs);
+    dom.timer.innerHTML = formatTimerValue(phaseState.phaseRemainingMs);
+    renderTheme(getPhaseTone(phaseState));
+}
+
+export function render() {
+    if (!dom.body || !dom.timer) {
+        return;
     }
 
-    render.showPrepFeedback = showPrepFeedback;
-    render.updatePrepTimeFromInput = updatePrepTimeFromInput;
-    render.setControlsHidden = setControlsHidden;
-    render.renderTheme = renderTheme;
-    render.getPrimaryActionState = getPrimaryActionState;
-    render.getPrimaryActionLabel = getPrimaryActionLabel;
-    render.render = renderAll;
-    render.getSnapshot = getSnapshot;
-    render.isFullscreenActive = isFullscreenActive;
-    render.toggleFullscreen = toggleFullscreen;
+    if (dom.toggleColors) {
+        dom.toggleColors.checked = state.inversedColors;
+    }
 
-    app.core.render = render;
-})(window);
+    renderTimer();
+    renderABCD();
+    renderActions();
+}
+
+export function getSnapshot() {
+    return {
+        primaryActionState: getPrimaryActionState(),
+        primaryActionLabel: getPrimaryActionLabel(),
+        emergencyEnabled: isRunning(),
+        inversedColors: state.inversedColors,
+        language: state.language,
+        controlsHidden: state.controlsHidden,
+        roundSeconds: state.totalSeconds,
+        prepSeconds: state.prepSeconds,
+        abcdMode: getABCDMode()
+    };
+}
